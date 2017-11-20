@@ -45,6 +45,7 @@ library("gridExtra")
 library("fpc")
 library("RColorBrewer")
 library("vegan")
+library("tsne")
 library("sandwich")
 library("cluster")
 library("grid")
@@ -170,11 +171,11 @@ matrix.spectra <- matrix(nrow=length(mq.norm), ncol = length(wv_mq))
 for (i in 1:length(mq.norm)){
   matrix.spectra[i,] <- intensity(mq.norm[[i]])
 }
-hs.mq <- new ("hyperSpec", spc = matrix.spectra, wavelength = wv_mq, labels = cell.name)
+hs.mq <- new("hyperSpec", spc = matrix.spectra, wavelength = wv_mq, labels = cell.name)
 
 # Choose if you want to run PCA prior to clustering
 PCA <- FALSE
-PEAKS <- TRUE
+PEAKS <- FALSE
 
 if(PCA == TRUE){
   # Perform PCA to reduce number of features in fingerprint
@@ -223,7 +224,7 @@ cluster_labels_pam <- data.frame(Sample = cell.name,
 
 # Method 2: the Mclust( ) function in the mclust package selects the optimal model according to BIC for EM initialized by hierarchical clustering for parameterized Gaussian mixture models.
 if(PEAKS == TRUE){
-  mc_fit <- Mclust(as.matrix(pc_cluster_bacteria), G = c(1:10))
+  mc_fit <- Mclust(as.matrix(pc_cluster_bacteria))
 } else {
   mc_fit <- Mclust(pc_cluster_bacteria, G = c(1:10))
 }
@@ -251,7 +252,6 @@ OPU_mq_merged <- data.frame(OPU_mq_merged, method =
                                 rep("Mclust", nrow(OPU_mq_mc))), 
                             replicate = do.call(rbind, strsplit(as.character(OPU_mq_merged$Sample), " "))[, 2],
                             growth_phase = do.call(rbind, strsplit(as.character(OPU_mq_merged$Sample), " "))[, 1])
-colnames(OPU_mq_merged)
 colnames(OPU_mq_merged)[colnames(OPU_mq_merged) == "cluster_label"] <- "OPU"
 ```
 
@@ -272,4 +272,81 @@ p2 <- ggplot(OPU_mq_merged, aes(x = replicate, y = Freq, fill = OPU))+
 
 print(p2)
 
+```
+
+# Contrast analysis
+## Hyperspec normalized  
+
+```{r  plot-contrasts-hs, fig.width = 10, fig.height= 6, dpi = 500, warning=FALSE}
+# ram_contrast(hyprs = hs.norm, comp1 = c("LB rep1", "LB rep2", "LB rep3"), 
+# comp2 = c("NB rep1","NB rep2","NB rep3"))
+ram.hs_lag_log <- ram_contrast(hs.norm, comp1 = c("lag rep1", "lag rep2", "lag rep3"),
+              comp2 = c("log rep1", "log rep2", "log rep3"), plot = FALSE)
+
+ram.hs_lag_stat <- ram_contrast(hs.norm, comp1 = c("lag rep1", "lag rep2", "lag rep3"),
+              comp2 = c("stat rep1", "stat rep2", "stat rep3"), plot = FALSE)
+
+ram.hs_log_stat <- ram_contrast(hs.norm, comp1 = c("log rep1", "log rep2", "log rep3"),
+              comp2 = c("stat rep1", "stat rep2", "stat rep3"), plot = FALSE)
+
+ram.hs_merged <- data.frame(rbind(ram.hs_lag_log, ram.hs_lag_stat, ram.hs_log_stat),
+                            Comparison = rep(c("lag-log", "lag-stat", "log-stat"), 
+                                               each = nrow(ram.hs_lag_stat))
+)
+
+v.hs <- ggplot2::ggplot(ram.hs_merged, ggplot2::aes(x = Wavenumber, y = Density, fill = Density))+
+  ggplot2::geom_point(shape = 21, colour="black", alpha = 0.4,
+                          size = 3)+
+  geom_line()+
+  facet_grid(.~Comparison)+
+  ggplot2::scale_fill_distiller(palette="RdBu", na.value="white") +
+  scale_x_continuous(breaks = seq(600,1800,200), labels = seq(600,1800,200))+
+  ggplot2::theme_bw()+
+     theme(axis.title=element_text(size=16), strip.text=element_text(size=16),
+        legend.title=element_text(size=15),legend.text=element_text(size=14),
+        axis.text = element_text(size=14),title=element_text(size=20),
+        axis.text.x = element_text(angle = 45, hjust = 1),
+        strip.background=element_rect(fill=adjustcolor("lightgray",0.2))
+        #,panel.grid.major = element_blank(), panel.grid.minor = element_blank()
+        )
+
+print(v.hs)
+```
+
+## Maldiquant normalized  
+
+```{r  plot-contrasts-mq, fig.width = 10, fig.height= 6, dpi = 500, warning=FALSE}
+# ram_contrast(hyprs = hs.norm, comp1 = c("LB rep1", "LB rep2", "LB rep3"), 
+# comp2 = c("NB rep1","NB rep2","NB rep3"))
+ram.mq_lag_log <- ram_contrast(hs.mq, comp1 = c("lag rep1", "lag rep2", "lag rep3"),
+              comp2 = c("log rep1", "log rep2", "log rep3"), plot = FALSE)
+
+ram.mq_lag_stat <- ram_contrast(hs.mq, comp1 = c("lag rep1", "lag rep2", "lag rep3"),
+              comp2 = c("stat rep1", "stat rep2", "stat rep3"), plot = FALSE)
+
+ram.mq_log_stat <- ram_contrast(hs.mq, comp1 = c("log rep1", "log rep2", "log rep3"),
+              comp2 = c("stat rep1", "stat rep2", "stat rep3"), plot = FALSE)
+
+ram.mq_merged <- data.frame(rbind(ram.mq_lag_log, ram.mq_lag_stat, ram.mq_log_stat),
+                            Comparison = rep(c("lag-log", "lag-stat", "log-stat"), 
+                                               each = nrow(ram.mq_lag_stat))
+)
+
+v.mq <- ggplot2::ggplot(ram.mq_merged, ggplot2::aes(x = Wavenumber, y = Density, fill = Density))+
+  ggplot2::geom_point(shape = 21, colour="black", alpha = 0.4,
+                          size = 3)+
+  geom_line()+
+  facet_grid(.~Comparison)+
+  ggplot2::scale_fill_distiller(palette="RdBu", na.value="white") +
+  scale_x_continuous(breaks = seq(600,1800,200), labels = seq(600,1800,200))+
+  ggplot2::theme_bw()+
+     theme(axis.title=element_text(size=16), strip.text=element_text(size=16),
+        legend.title=element_text(size=15),legend.text=element_text(size=14),
+        axis.text = element_text(size=14),title=element_text(size=20),
+        axis.text.x = element_text(angle = 45, hjust = 1),
+        strip.background=element_rect(fill=adjustcolor("lightgray",0.2))
+        #,panel.grid.major = element_blank(), panel.grid.minor = element_blank()
+        )
+
+print(v.mq)
 ```

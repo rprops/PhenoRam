@@ -18,6 +18,7 @@ library("gridExtra")
 library("fpc")
 library("RColorBrewer")
 library("vegan")
+library("tsne")
 library("sandwich")
 library("cluster")
 library("grid")
@@ -218,10 +219,11 @@ matrix.spectra <- matrix(nrow=length(mq.norm), ncol = length(wv_mq))
 for (i in 1:length(mq.norm)){
   matrix.spectra[i,] <- intensity(mq.norm[[i]])
 }
-hs.mq <- new ("hyperSpec", spc = matrix.spectra, wavelength = wv_mq, labels = cell.name)
+hs.mq <- new("hyperSpec", spc = matrix.spectra, wavelength = wv_mq, labels = cell.name)
 
 # Choose if you want to run PCA prior to clustering
-PCA <- TRUE
+PCA <- FALSE
+PEAKS <- FALSE
 
 if(PCA == TRUE){
   # Perform PCA to reduce number of features in fingerprint
@@ -231,6 +233,19 @@ if(PCA == TRUE){
   thresh <- 0.9
   nr_pc_bacteria <- min(which((cumsum(vegan::eigenvals(pca_bacteria)/sum(vegan::eigenvals(pca_bacteria)))>thresh) == TRUE))
   pc_cluster_bacteria <- pca_bacteria$x[, 1:nr_pc_bacteria]
+} else if(PEAKS == TRUE){
+  # Run peak detection algorithm
+    peaks <- detectPeaks(mq.norm, method="MAD", halfWindowSize=1, SNR=0.001)
+    plot(mq.norm[[1]], xlim=c(600, 1800))
+    points(peaks[[1]], col="red", pch=4)
+
+    # Tolerance for wave number shift
+    peaks <- binPeaks(peaks, tolerance = 0.002)
+  
+    # Filter out intensities at peak wave numbers
+    peaks <- filterPeaks(peaks, minFrequency = 0.25)
+
+    pc_cluster_bacteria <- intensityMatrix(peaks, mq.norm)
 } else {
   pc_cluster_bacteria <- hs.mq
 }
@@ -245,11 +260,11 @@ for(i in 2:50){
 ```
 
 ```
-## Mon Nov 20 16:20:04 2017 ---- at k =  10/536
-## Mon Nov 20 16:20:07 2017 ---- at k =  20/536
-## Mon Nov 20 16:20:13 2017 ---- at k =  30/536
-## Mon Nov 20 16:20:20 2017 ---- at k =  40/536
-## Mon Nov 20 16:20:32 2017 ---- at k =  50/536
+## Mon Nov 20 19:01:32 2017 ---- at k =  10/536
+## Mon Nov 20 19:01:35 2017 ---- at k =  20/536
+## Mon Nov 20 19:01:38 2017 ---- at k =  30/536
+## Mon Nov 20 19:01:47 2017 ---- at k =  40/536
+## Mon Nov 20 19:02:02 2017 ---- at k =  50/536
 ```
 
 ```r
@@ -271,7 +286,12 @@ cluster_labels_pam <- data.frame(Sample = cell.name,
                                       cluster_label = clusters_bacteria$clustering)
 
 # Method 2: the Mclust( ) function in the mclust package selects the optimal model according to BIC for EM initialized by hierarchical clustering for parameterized Gaussian mixture models.
-mc_fit <- Mclust(pc_cluster_bacteria, G = c(1:10))
+if(PEAKS == TRUE){
+  mc_fit <- Mclust(as.matrix(pc_cluster_bacteria))
+} else {
+  mc_fit <- Mclust(pc_cluster_bacteria, G = c(1:10))
+}
+
 # plot(fit) # plot results 
 summary(mc_fit) # display the best model
 ```
@@ -281,14 +301,14 @@ summary(mc_fit) # display the best model
 ## Gaussian finite mixture model fitted by EM algorithm 
 ## ----------------------------------------------------
 ## 
-## Mclust VVE (ellipsoidal, equal orientation) model with 10 components:
+## Mclust VII (spherical, varying volume) model with 10 components:
 ## 
-##  log.likelihood   n  df     BIC      ICL
-##        28704.31 536 225 55994.7 55990.77
+##  log.likelihood   n   df     BIC     ICL
+##         1272825 536 3349 2524604 2524604
 ## 
 ## Clustering table:
 ##  1  2  3  4  5  6  7  8  9 10 
-## 59 62 36 63 24 58 59 59 69 47
+## 70 47 61 25 46 45 77 61 60 44
 ```
 
 ```r
@@ -312,15 +332,6 @@ OPU_mq_merged <- data.frame(OPU_mq_merged, method =
                                 rep("Mclust", nrow(OPU_mq_mc))), 
                             replicate = do.call(rbind, strsplit(as.character(OPU_mq_merged$Sample), " "))[, 2],
                             growth_phase = do.call(rbind, strsplit(as.character(OPU_mq_merged$Sample), " "))[, 1])
-colnames(OPU_mq_merged)
-```
-
-```
-## [1] "Sample"        "cluster_label" "Freq"          "method"       
-## [5] "replicate"     "growth_phase"
-```
-
-```r
 colnames(OPU_mq_merged)[colnames(OPU_mq_merged) == "cluster_label"] <- "OPU"
 ```
 
@@ -344,3 +355,218 @@ print(p2)
 ```
 
 <img src="Figures/cached/plot-clusters-mq-1.png" style="display: block; margin: auto;" />
+
+# Contrast analysis
+## Hyperspec normalized  
+
+
+```r
+# ram_contrast(hyprs = hs.norm, comp1 = c("LB rep1", "LB rep2", "LB rep3"), 
+# comp2 = c("NB rep1","NB rep2","NB rep3"))
+ram.hs_lag_log <- ram_contrast(hs.norm, comp1 = c("lag rep1", "lag rep2", "lag rep3"),
+              comp2 = c("log rep1", "log rep2", "log rep3"), plot = FALSE)
+```
+
+```
+## -----------------------------------------------------------------------------------------------------
+##  
+## 	 Your cells are distributed over these samples:
+## 
+##  Samples
+##  lag rep1  lag rep2  lag rep3  log rep1  log rep2  log rep3 stat rep1 
+##        60        62        61        58        60        59        59 
+## stat rep2 stat rep3 
+##        56        61 
+## -----------------------------------------------------------------------------------------------------
+##  
+## 	 Returning contrasts between mean spectra for 183 cells of
+##  c("lag rep1", "lag rep2", "lag rep3")
+## 	 and 177 cells of
+##  c("log rep1", "log rep2", "log rep3")
+## -----------------------------------------------------------------------------------------------------
+## 
+```
+
+```r
+ram.hs_lag_stat <- ram_contrast(hs.norm, comp1 = c("lag rep1", "lag rep2", "lag rep3"),
+              comp2 = c("stat rep1", "stat rep2", "stat rep3"), plot = FALSE)
+```
+
+```
+## -----------------------------------------------------------------------------------------------------
+##  
+## 	 Your cells are distributed over these samples:
+## 
+##  Samples
+##  lag rep1  lag rep2  lag rep3  log rep1  log rep2  log rep3 stat rep1 
+##        60        62        61        58        60        59        59 
+## stat rep2 stat rep3 
+##        56        61 
+## -----------------------------------------------------------------------------------------------------
+##  
+## 	 Returning contrasts between mean spectra for 183 cells of
+##  c("lag rep1", "lag rep2", "lag rep3")
+## 	 and 176 cells of
+##  c("stat rep1", "stat rep2", "stat rep3")
+## -----------------------------------------------------------------------------------------------------
+## 
+```
+
+```r
+ram.hs_log_stat <- ram_contrast(hs.norm, comp1 = c("log rep1", "log rep2", "log rep3"),
+              comp2 = c("stat rep1", "stat rep2", "stat rep3"), plot = FALSE)
+```
+
+```
+## -----------------------------------------------------------------------------------------------------
+##  
+## 	 Your cells are distributed over these samples:
+## 
+##  Samples
+##  lag rep1  lag rep2  lag rep3  log rep1  log rep2  log rep3 stat rep1 
+##        60        62        61        58        60        59        59 
+## stat rep2 stat rep3 
+##        56        61 
+## -----------------------------------------------------------------------------------------------------
+##  
+## 	 Returning contrasts between mean spectra for 177 cells of
+##  c("log rep1", "log rep2", "log rep3")
+## 	 and 176 cells of
+##  c("stat rep1", "stat rep2", "stat rep3")
+## -----------------------------------------------------------------------------------------------------
+## 
+```
+
+```r
+ram.hs_merged <- data.frame(rbind(ram.hs_lag_log, ram.hs_lag_stat, ram.hs_log_stat),
+                            Comparison = rep(c("lag-log", "lag-stat", "log-stat"), 
+                                               each = nrow(ram.hs_lag_stat))
+)
+
+v.hs <- ggplot2::ggplot(ram.hs_merged, ggplot2::aes(x = Wavenumber, y = Density, fill = Density))+
+  ggplot2::geom_point(shape = 21, colour="black", alpha = 0.4,
+                          size = 3)+
+  geom_line()+
+  facet_grid(.~Comparison)+
+  ggplot2::scale_fill_distiller(palette="RdBu", na.value="white") +
+  scale_x_continuous(breaks = seq(600,1800,200), labels = seq(600,1800,200))+
+  ggplot2::theme_bw()+
+     theme(axis.title=element_text(size=16), strip.text=element_text(size=16),
+        legend.title=element_text(size=15),legend.text=element_text(size=14),
+        axis.text = element_text(size=14),title=element_text(size=20),
+        axis.text.x = element_text(angle = 45, hjust = 1),
+        strip.background=element_rect(fill=adjustcolor("lightgray",0.2))
+        #,panel.grid.major = element_blank(), panel.grid.minor = element_blank()
+        )
+
+print(v.hs)
+```
+
+<img src="Figures/cached/plot-contrasts-hs-1.png" style="display: block; margin: auto;" />
+
+## Maldiquant normalized  
+
+
+```r
+# ram_contrast(hyprs = hs.norm, comp1 = c("LB rep1", "LB rep2", "LB rep3"), 
+# comp2 = c("NB rep1","NB rep2","NB rep3"))
+ram.mq_lag_log <- ram_contrast(hs.mq, comp1 = c("lag rep1", "lag rep2", "lag rep3"),
+              comp2 = c("log rep1", "log rep2", "log rep3"), plot = FALSE)
+```
+
+```
+## -----------------------------------------------------------------------------------------------------
+##  
+## 	 Your cells are distributed over these samples:
+## 
+##  Samples
+##  lag rep1  lag rep2  lag rep3  log rep1  log rep2  log rep3 stat rep1 
+##        60        62        61        58        60        59        59 
+## stat rep2 stat rep3 
+##        56        61 
+## -----------------------------------------------------------------------------------------------------
+##  
+## 	 Returning contrasts between mean spectra for 183 cells of
+##  c("lag rep1", "lag rep2", "lag rep3")
+## 	 and 177 cells of
+##  c("log rep1", "log rep2", "log rep3")
+## -----------------------------------------------------------------------------------------------------
+## 
+```
+
+```r
+ram.mq_lag_stat <- ram_contrast(hs.mq, comp1 = c("lag rep1", "lag rep2", "lag rep3"),
+              comp2 = c("stat rep1", "stat rep2", "stat rep3"), plot = FALSE)
+```
+
+```
+## -----------------------------------------------------------------------------------------------------
+##  
+## 	 Your cells are distributed over these samples:
+## 
+##  Samples
+##  lag rep1  lag rep2  lag rep3  log rep1  log rep2  log rep3 stat rep1 
+##        60        62        61        58        60        59        59 
+## stat rep2 stat rep3 
+##        56        61 
+## -----------------------------------------------------------------------------------------------------
+##  
+## 	 Returning contrasts between mean spectra for 183 cells of
+##  c("lag rep1", "lag rep2", "lag rep3")
+## 	 and 176 cells of
+##  c("stat rep1", "stat rep2", "stat rep3")
+## -----------------------------------------------------------------------------------------------------
+## 
+```
+
+```r
+ram.mq_log_stat <- ram_contrast(hs.mq, comp1 = c("log rep1", "log rep2", "log rep3"),
+              comp2 = c("stat rep1", "stat rep2", "stat rep3"), plot = FALSE)
+```
+
+```
+## -----------------------------------------------------------------------------------------------------
+##  
+## 	 Your cells are distributed over these samples:
+## 
+##  Samples
+##  lag rep1  lag rep2  lag rep3  log rep1  log rep2  log rep3 stat rep1 
+##        60        62        61        58        60        59        59 
+## stat rep2 stat rep3 
+##        56        61 
+## -----------------------------------------------------------------------------------------------------
+##  
+## 	 Returning contrasts between mean spectra for 177 cells of
+##  c("log rep1", "log rep2", "log rep3")
+## 	 and 176 cells of
+##  c("stat rep1", "stat rep2", "stat rep3")
+## -----------------------------------------------------------------------------------------------------
+## 
+```
+
+```r
+ram.mq_merged <- data.frame(rbind(ram.mq_lag_log, ram.mq_lag_stat, ram.mq_log_stat),
+                            Comparison = rep(c("lag-log", "lag-stat", "log-stat"), 
+                                               each = nrow(ram.mq_lag_stat))
+)
+
+v.mq <- ggplot2::ggplot(ram.mq_merged, ggplot2::aes(x = Wavenumber, y = Density, fill = Density))+
+  ggplot2::geom_point(shape = 21, colour="black", alpha = 0.4,
+                          size = 3)+
+  geom_line()+
+  facet_grid(.~Comparison)+
+  ggplot2::scale_fill_distiller(palette="RdBu", na.value="white") +
+  scale_x_continuous(breaks = seq(600,1800,200), labels = seq(600,1800,200))+
+  ggplot2::theme_bw()+
+     theme(axis.title=element_text(size=16), strip.text=element_text(size=16),
+        legend.title=element_text(size=15),legend.text=element_text(size=14),
+        axis.text = element_text(size=14),title=element_text(size=20),
+        axis.text.x = element_text(angle = 45, hjust = 1),
+        strip.background=element_rect(fill=adjustcolor("lightgray",0.2))
+        #,panel.grid.major = element_blank(), panel.grid.minor = element_blank()
+        )
+
+print(v.mq)
+```
+
+<img src="Figures/cached/plot-contrasts-mq-1.png" style="display: block; margin: auto;" />
