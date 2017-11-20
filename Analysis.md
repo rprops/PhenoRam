@@ -444,11 +444,11 @@ ram.hs_merged <- data.frame(rbind(ram.hs_lag_log, ram.hs_lag_stat, ram.hs_log_st
 )
 
 v.hs <- ggplot2::ggplot(ram.hs_merged, ggplot2::aes(x = Wavenumber, y = Density, fill = Density))+
-  ggplot2::geom_point(shape = 21, colour="black", alpha = 0.4,
+  ggplot2::geom_point(shape = 21, colour="black", alpha = 1.0,
                           size = 3)+
   geom_line()+
   facet_grid(.~Comparison)+
-  ggplot2::scale_fill_distiller(palette="RdBu", na.value="white") +
+  ggplot2::scale_fill_distiller(palette="RdBu", na.value="white", limits = c(-0.22,0.22)) +
   scale_x_continuous(breaks = seq(600,1800,200), labels = seq(600,1800,200))+
   ggplot2::theme_bw()+
      theme(axis.title=element_text(size=16), strip.text=element_text(size=16),
@@ -551,11 +551,11 @@ ram.mq_merged <- data.frame(rbind(ram.mq_lag_log, ram.mq_lag_stat, ram.mq_log_st
 )
 
 v.mq <- ggplot2::ggplot(ram.mq_merged, ggplot2::aes(x = Wavenumber, y = Density, fill = Density))+
-  ggplot2::geom_point(shape = 21, colour="black", alpha = 0.4,
+  ggplot2::geom_point(shape = 21, colour="black", alpha = 1.0,
                           size = 3)+
   geom_line()+
   facet_grid(.~Comparison)+
-  ggplot2::scale_fill_distiller(palette="RdBu", na.value="white") +
+  ggplot2::scale_fill_distiller(palette="RdBu", na.value="white", limits = c(-0.22,0.22)) +
   scale_x_continuous(breaks = seq(600,1800,200), labels = seq(600,1800,200))+
   ggplot2::theme_bw()+
      theme(axis.title=element_text(size=16), strip.text=element_text(size=16),
