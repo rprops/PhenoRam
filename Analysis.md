@@ -1,40 +1,13 @@
----
-title: "PhenoRam analysis"
-author: "Cristina Garcia Timmermans & Ruben Props"
-date: "Today"
-output:
-  html_document:
-    code_folding: show
-    highlight: haddock
-    keep_md: yes
-    theme: united
-    toc: yes
-    toc_float:
-      collapsed: no
-      smooth_scroll: yes
-      toc_depth: 2
-    css: report_styles.css
-editor_options: 
-  chunk_output_type: console
----
+# PhenoRam analysis
+Cristina Garcia Timmermans & Ruben Props  
+Today  
 
-```{r setup, include=FALSE}
-knitr::opts_chunk$set(eval = TRUE, 
-                      echo = TRUE, 
-                      cache = TRUE,
-                      include = TRUE,
-                      collapse = FALSE,
-                      dependson = NULL,
-                      engine = "R", # Chunks will always have R code, unless noted
-                      error = TRUE,
-                      fig.path="Figures/cached/",  # Set the figure options
-                      fig.align = "center"
-                      )
-```
+
 
 # Load libraries
 
-```{r load-libraries, message=FALSE, warning = FALSE}
+
+```r
 library("Phenoflow")
 library("mclust")
 library("plyr")
@@ -73,7 +46,8 @@ We will start with the hyperspec processed spectr:
 * Map back to original samples
 * Calculate phenotypic diversity in each sample using Hill numbers
 
-```{r determine-clusters, fig.width = 7, fig.height= 6, dpi = 500, warning=FALSE}
+
+```r
 # Choose if you want to run PCA prior to clustering
 PCA <- TRUE
 
@@ -88,7 +62,45 @@ if(PCA == TRUE){
 } else {
   pc_cluster_bacteria <- hs.norm
 }
+```
 
+```
+## Loading required package: hyperSpec
+```
+
+```
+## Package hyperSpec, version 0.99-20171005
+## 
+## To get started, try
+##    vignette ("hyperspec")
+##    package?hyperSpec 
+##    vignette (package = "hyperSpec")
+## 
+## If you use this package please cite it appropriately.
+##    citation("hyperSpec")
+## will give you the correct reference.
+## 
+## The project homepage is http://hyperspec.r-forge.r-project.org
+```
+
+```
+## 
+## Attaching package: 'hyperSpec'
+```
+
+```
+## The following object is masked from 'package:dplyr':
+## 
+##     collapse
+```
+
+```
+## The following object is masked from 'package:plyr':
+## 
+##     empty
+```
+
+```r
 # Evaluate number of robust clusters by means of silhouette index
 # We limit the search to 50 clusters
 tmp.si <- c()
@@ -96,12 +108,27 @@ for(i in 2:50){
   if(i%%10 == 0) cat(date(), paste0("---- at k =  ", i, "/",  nrow(pc_cluster_bacteria), "\n"))
   tmp.si[i] <- pam(pc_cluster_bacteria, k = i)$silinfo$avg.width
 }
+```
+
+```
+## Mon Nov 20 16:19:24 2017 ---- at k =  10/536
+## Mon Nov 20 16:19:27 2017 ---- at k =  20/536
+## Mon Nov 20 16:19:34 2017 ---- at k =  30/536
+## Mon Nov 20 16:19:41 2017 ---- at k =  40/536
+## Mon Nov 20 16:19:52 2017 ---- at k =  50/536
+```
+
+```r
 nr_clusters_bacteria <- which(tmp.si == max(tmp.si, na.rm = TRUE))
 
 # Plot Silhouette index distribution
 plot(tmp.si, type = "l", ylab = "Silhouette index", 
      xlab = "Number of clusters")
+```
 
+<img src="Figures/cached/determine-clusters-1.png" style="display: block; margin: auto;" />
+
+```r
 # Cluster samples and export cluster labels
 clusters_bacteria <- pam(pc_cluster_bacteria, k = nr_clusters_bacteria)
 
@@ -116,7 +143,24 @@ mc_fit <- Mclust(pc_cluster_bacteria, G = c(1:10))
 
 # plot(fit) # plot results 
 summary(mc_fit) # display the best model
+```
 
+```
+## ----------------------------------------------------
+## Gaussian finite mixture model fitted by EM algorithm 
+## ----------------------------------------------------
+## 
+## Mclust VVE (ellipsoidal, equal orientation) model with 10 components:
+## 
+##  log.likelihood   n  df     BIC      ICL
+##        28704.31 536 225 55994.7 55990.77
+## 
+## Clustering table:
+##  1  2  3  4  5  6  7  8  9 10 
+## 59 62 36 63 24 58 59 59 69 47
+```
+
+```r
 cluster_labels_mc <- data.frame(Sample = names(clusters_bacteria$clustering),
                                       cluster_label = mc_fit$classification)
 
@@ -141,7 +185,8 @@ colnames(OPU_hs_merged)[colnames(OPU_hs_merged) == "cluster_label"] <- "OPU"
 ```
 
 # Plot OPU table
-```{r plot-clusters, fig.width = 7, fig.height= 6, dpi = 500, warning=FALSE}
+
+```r
 # Plot according to metadata
 p1 <- ggplot(OPU_hs_merged, aes(x = replicate, y = Freq, fill = OPU))+
   geom_bar(stat = "identity")+
@@ -159,11 +204,14 @@ p1 <- ggplot(OPU_hs_merged, aes(x = replicate, y = Freq, fill = OPU))+
 print(p1)
 ```
 
+<img src="Figures/cached/plot-clusters-1.png" style="display: block; margin: auto;" />
+
 ## B. Maldiquant-normalized spectra  
 
 Same analysis as for hyperspec-normalized spectra.
 
-```{r determine-clusters-mq, fig.width = 7, fig.height= 6, dpi = 500, warning=FALSE}
+
+```r
 # Convert massSpectrum object to hyperspec
 wv_mq <- mass(mq.norm[[1]])
 matrix.spectra <- matrix(nrow=length(mq.norm), ncol = length(wv_mq))
@@ -173,8 +221,7 @@ for (i in 1:length(mq.norm)){
 hs.mq <- new ("hyperSpec", spc = matrix.spectra, wavelength = wv_mq, labels = cell.name)
 
 # Choose if you want to run PCA prior to clustering
-PCA <- FALSE
-PEAKS <- TRUE
+PCA <- TRUE
 
 if(PCA == TRUE){
   # Perform PCA to reduce number of features in fingerprint
@@ -184,19 +231,6 @@ if(PCA == TRUE){
   thresh <- 0.9
   nr_pc_bacteria <- min(which((cumsum(vegan::eigenvals(pca_bacteria)/sum(vegan::eigenvals(pca_bacteria)))>thresh) == TRUE))
   pc_cluster_bacteria <- pca_bacteria$x[, 1:nr_pc_bacteria]
-} else if(PEAKS == TRUE){
-  # Run peak detection algorithm
-    peaks <- detectPeaks(mq.norm, method="MAD", halfWindowSize=1, SNR=0.001)
-    plot(mq.norm[[1]], xlim=c(600, 1800))
-    points(peaks[[1]], col="red", pch=4)
-
-    # Tolerance for wave number shift
-    peaks <- binPeaks(peaks, tolerance = 0.002)
-  
-    # Filter out intensities at peak wave numbers
-    peaks <- filterPeaks(peaks, minFrequency = 0.25)
-
-    pc_cluster_bacteria <- intensityMatrix(peaks, mq.norm)
 } else {
   pc_cluster_bacteria <- hs.mq
 }
@@ -208,12 +242,27 @@ for(i in 2:50){
   if(i%%10 == 0) cat(date(), paste0("---- at k =  ", i, "/",  nrow(pc_cluster_bacteria), "\n"))
   tmp.si[i] <- pam(pc_cluster_bacteria, k = i)$silinfo$avg.width
 }
+```
+
+```
+## Mon Nov 20 16:20:04 2017 ---- at k =  10/536
+## Mon Nov 20 16:20:07 2017 ---- at k =  20/536
+## Mon Nov 20 16:20:13 2017 ---- at k =  30/536
+## Mon Nov 20 16:20:20 2017 ---- at k =  40/536
+## Mon Nov 20 16:20:32 2017 ---- at k =  50/536
+```
+
+```r
 nr_clusters_bacteria <- which(tmp.si == max(tmp.si, na.rm = TRUE))
 
 # Plot Silhouette index distribution
 plot(tmp.si, type = "l", ylab = "Silhouette index", 
      xlab = "Number of clusters")
+```
 
+<img src="Figures/cached/determine-clusters-mq-1.png" style="display: block; margin: auto;" />
+
+```r
 # Cluster samples and export cluster labels
 clusters_bacteria <- pam(pc_cluster_bacteria, k = nr_clusters_bacteria)
 
@@ -222,15 +271,27 @@ cluster_labels_pam <- data.frame(Sample = cell.name,
                                       cluster_label = clusters_bacteria$clustering)
 
 # Method 2: the Mclust( ) function in the mclust package selects the optimal model according to BIC for EM initialized by hierarchical clustering for parameterized Gaussian mixture models.
-if(PEAKS == TRUE){
-  mc_fit <- Mclust(as.matrix(pc_cluster_bacteria), G = c(1:10))
-} else {
-  mc_fit <- Mclust(pc_cluster_bacteria, G = c(1:10))
-}
-
+mc_fit <- Mclust(pc_cluster_bacteria, G = c(1:10))
 # plot(fit) # plot results 
 summary(mc_fit) # display the best model
+```
 
+```
+## ----------------------------------------------------
+## Gaussian finite mixture model fitted by EM algorithm 
+## ----------------------------------------------------
+## 
+## Mclust VVE (ellipsoidal, equal orientation) model with 10 components:
+## 
+##  log.likelihood   n  df     BIC      ICL
+##        28704.31 536 225 55994.7 55990.77
+## 
+## Clustering table:
+##  1  2  3  4  5  6  7  8  9 10 
+## 59 62 36 63 24 58 59 59 69 47
+```
+
+```r
 cluster_labels_mc <- data.frame(Sample = cell.name,
                                       cluster_label = mc_fit$classification)
 
@@ -252,11 +313,20 @@ OPU_mq_merged <- data.frame(OPU_mq_merged, method =
                             replicate = do.call(rbind, strsplit(as.character(OPU_mq_merged$Sample), " "))[, 2],
                             growth_phase = do.call(rbind, strsplit(as.character(OPU_mq_merged$Sample), " "))[, 1])
 colnames(OPU_mq_merged)
+```
+
+```
+## [1] "Sample"        "cluster_label" "Freq"          "method"       
+## [5] "replicate"     "growth_phase"
+```
+
+```r
 colnames(OPU_mq_merged)[colnames(OPU_mq_merged) == "cluster_label"] <- "OPU"
 ```
 
 # Plot OPU table
-```{r  plot-clusters-mq, fig.width = 7, fig.height= 6, dpi = 500, warning=FALSE}
+
+```r
 p2 <- ggplot(OPU_mq_merged, aes(x = replicate, y = Freq, fill = OPU))+
   geom_bar(stat = "identity")+
   scale_fill_brewer(palette = "Paired")+
@@ -271,5 +341,6 @@ p2 <- ggplot(OPU_mq_merged, aes(x = replicate, y = Freq, fill = OPU))+
         )
 
 print(p2)
-
 ```
+
+<img src="Figures/cached/plot-clusters-mq-1.png" style="display: block; margin: auto;" />
