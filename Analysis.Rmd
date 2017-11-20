@@ -1,0 +1,151 @@
+---
+title: "PhenoRam analysis"
+author: "Cristina Garcia Timmermans & Ruben Props"
+date: "Today"
+output:
+  html_document:
+    code_folding: show
+    highlight: haddock
+    keep_md: yes
+    theme: united
+    toc: yes
+    toc_float:
+      collapsed: no
+      smooth_scroll: yes
+      toc_depth: 2
+    css: report_styles.css
+editor_options: 
+  chunk_output_type: console
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(eval = TRUE, 
+                      echo = TRUE, 
+                      cache = TRUE,
+                      include = TRUE,
+                      collapse = FALSE,
+                      dependson = NULL,
+                      engine = "R", # Chunks will always have R code, unless noted
+                      error = TRUE,
+                      fig.path="Figures/cached/",  # Set the figure options
+                      fig.align = "center"
+                      )
+```
+
+# Load libraries
+
+```{r load-libraries, message=FALSE, warning = FALSE}
+library("Phenoflow")
+library("plyr")
+library("dplyr")
+library("gridExtra")
+library("ggplot2")
+library("formatR")
+library("gridExtra")
+library("cowplot")
+library("RColorBrewer")
+library("vegan")
+library("sandwich")
+library("cluster")
+library("grid")
+library("car")
+library("egg")
+library("phyloseq")
+library("splines")
+library("caret") # for cross validation
+library("foreach") # for parallelization
+source("functions.R")
+library("flowAI") # for denoising of FCM data
+load("workspace.RData")
+
+my.settings <- list(
+  strip.background=list(col="transparent"),
+  strip.border=list(col="transparent", cex=5),
+  gate=list(col="black", fill="lightblue", alpha=0.2,border=NA,lwd=2),
+  panel.background=list(col="lightgray"),
+  background=list(col="white"))
+```
+
+# Cluster analysis
+## A. Hyperspec-normalized spectra
+We will start with the hyperspec processed spectr:  
+
+* Select number of stable clusters in data set
+* Map back to original samples
+* Calculate phenotypic diversity in each sample using Hill numbers
+
+```{r determine-clusters, fig.width = 7, fig.height= 6, dpi = 500, warning=FALSE}
+# Perform PCA to reduce number of features in fingerprint
+pca_bacteria <- prcomp(hs.norm)
+
+# Only retain PC which explain 90% of the variance
+thresh <- 0.75
+nr_pc_bacteria <- min(which((cumsum(vegan::eigenvals(pca_bacteria)/sum(vegan::eigenvals(pca_bacteria)))>thresh) == TRUE))
+pc_cluster_bacteria <- pca_bacteria$x[, 1:nr_pc_bacteria]
+
+# Evaluate number of robust clusters by means of silhouette index
+# We limit the search to 50 clusters
+tmp.si <- c()
+for(i in 2:50){
+  if(i%%10 == 0) cat(date(), paste0("---- at k =  ", i, "/",  nrow(pc_cluster_bacteria), "\n"))
+  tmp.si[i] <- pam(pc_cluster_bacteria, k = i)$silinfo$avg.width
+}
+nr_clusters_bacteria <- which(tmp.si == max(tmp.si, na.rm = TRUE))
+
+# Plot Silhouette index distribution
+plot(tmp.si, type = "l", ylab = "Silhouette index", 
+     xlab = "Number of clusters")
+
+# Cluster samples and export cluster labels
+clusters_bacteria <- pam(pc_cluster_bacteria, k = nr_clusters_bacteria)
+
+# Extract cluster labels
+cluster_labels_bacteria <- data.frame(Sample = names(clusters_bacteria$clustering),
+                                      cluster_label = clusters_bacteria$clustering)
+
+# Extract count table (i.e. "operational phenotypic unit table") for each sample
+table(cluster_labels_bacteria)
+
+```
+
+# Plot OPU table
+```{r determine-clusters, fig.width = 7, fig.height= 6, dpi = 500, warning=FALSE}
+# Plot according to metadata
+
+```
+
+## A. Maldiquant-normalized spectra  
+
+Same analysis as for hyperspec-normalized spectra.
+
+```{r determine-clusters, fig.width = 7, fig.height= 6, dpi = 500, warning=FALSE}
+# Convert massSpectrum object to hyperspec
+peaks <- filterPeaks(peaks, minFrequency=0.2)
+
+# Perform PCA to reduce number of features in fingerprint
+pca_bacteria <- prcomp(mq.norm)
+
+# Only retain PC which explain 90% of the variance
+thresh <- 0.95
+nr_pc_bacteria <- min(which((cumsum(vegan::eigenvals(pca_bacteria)/sum(vegan::eigenvals(pca_bacteria)))>thresh) == TRUE))
+pc_cluster_bacteria <- pca_bacteria$x[, 1:nr_pc_bacteria]
+
+# Evaluate number of robust clusters by means of silhouette index
+tmp.si <- c()
+for(i in 2:50){
+  if(i%%50 == 0) cat(date(), paste0("---- at k =  ", i, "/",  nrow(pc_cluster_bacteria), "\n"))
+  tmp.si[i] <- pam(pc_cluster_bacteria, k = i)$silinfo$avg.width
+}
+nr_clusters_bacteria <- which(tmp.si == max(tmp.si, na.rm = TRUE))
+
+# Cluster samples and export cluster labels
+clusters_bacteria <- pam(pc_cluster_bacteria, k = nr_clusters_bacteria)
+
+# Extract cluster labels
+cluster_labels_bacteria <- data.frame(Sample = names(clusters_bacteria$clustering),
+                                      cluster_label = clusters_bacteria$clustering)
+
+# Extract count table (i.e. "operational phenotypic unit table") for each sample
+
+
+```
