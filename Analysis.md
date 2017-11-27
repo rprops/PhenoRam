@@ -52,7 +52,7 @@ We will start with the hyperspec processed spectr:
 
 ```r
 # Choose if you want to run PCA prior to clustering
-PCA <- TRUE
+PCA <- FALSE
 
 if(PCA == TRUE){
   # Perform PCA to reduce number of features in fingerprint
@@ -64,6 +64,14 @@ if(PCA == TRUE){
   pc_cluster_bacteria <- pca_bacteria$x[, 1:nr_pc_bacteria]
 } else {
   pc_cluster_bacteria <- hs.norm
+}
+
+# Evaluate number of robust clusters by means of silhouette index
+# We limit the search to 50 clusters
+tmp.si <- c()
+for(i in 2:50){
+  if(i%%10 == 0) cat(date(), paste0("---- at k =  ", i, "/",  nrow(pc_cluster_bacteria), "\n"))
+  tmp.si[i] <- pam(pc_cluster_bacteria, k = i)$silinfo$avg.width
 }
 ```
 
@@ -103,22 +111,12 @@ if(PCA == TRUE){
 ##     empty
 ```
 
-```r
-# Evaluate number of robust clusters by means of silhouette index
-# We limit the search to 50 clusters
-tmp.si <- c()
-for(i in 2:50){
-  if(i%%10 == 0) cat(date(), paste0("---- at k =  ", i, "/",  nrow(pc_cluster_bacteria), "\n"))
-  tmp.si[i] <- pam(pc_cluster_bacteria, k = i)$silinfo$avg.width
-}
 ```
-
-```
-## Mon Nov 20 16:19:24 2017 ---- at k =  10/536
-## Mon Nov 20 16:19:27 2017 ---- at k =  20/536
-## Mon Nov 20 16:19:34 2017 ---- at k =  30/536
-## Mon Nov 20 16:19:41 2017 ---- at k =  40/536
-## Mon Nov 20 16:19:52 2017 ---- at k =  50/536
+## Mon Nov 27 15:19:59 2017 ---- at k =  10/536
+## Mon Nov 27 15:20:03 2017 ---- at k =  20/536
+## Mon Nov 27 15:20:06 2017 ---- at k =  30/536
+## Mon Nov 27 15:20:12 2017 ---- at k =  40/536
+## Mon Nov 27 15:20:26 2017 ---- at k =  50/536
 ```
 
 ```r
@@ -140,9 +138,14 @@ cluster_labels_pam <- data.frame(Sample = names(clusters_bacteria$clustering),
                                       cluster_label = clusters_bacteria$clustering)
 
 # Method 2: the Mclust( ) function in the mclust package selects the optimal model according to BIC for EM initialized by hierarchical clustering for parameterized Gaussian mixture models.
-# BIC = mclustBIC(pc_cluster_bacteria$spc, G = c(1:10), modeNames = c("VVI"))
-# plot(BIC)
-mc_fit <- Mclust(pc_cluster_bacteria, G = c(1:10))
+BIC = mclustBIC(pc_cluster_bacteria$spc, G = c(1:20))
+plot(BIC);lines(x = c(13, 13), y = c(0, 10e6), col = "red", lty = 2)
+```
+
+<img src="Figures/cached/determine-clusters-2.png" style="display: block; margin: auto;" />
+
+```r
+mc_fit <- Mclust(pc_cluster_bacteria, G = 13)
 
 # plot(fit) # plot results 
 summary(mc_fit) # display the best model
@@ -153,14 +156,14 @@ summary(mc_fit) # display the best model
 ## Gaussian finite mixture model fitted by EM algorithm 
 ## ----------------------------------------------------
 ## 
-## Mclust VVE (ellipsoidal, equal orientation) model with 10 components:
+## Mclust VII (spherical, varying volume) model with 13 components:
 ## 
-##  log.likelihood   n  df     BIC      ICL
-##        28704.31 536 225 55994.7 55990.77
+##  log.likelihood   n   df     BIC     ICL
+##         1285302 536 4354 2543243 2543243
 ## 
 ## Clustering table:
-##  1  2  3  4  5  6  7  8  9 10 
-## 59 62 36 63 24 58 59 59 69 47
+##  1  2  3  4  5  6  7  8  9 10 11 12 13 
+## 37 49 26 20 36 17 41 75 55 59 43 34 44
 ```
 
 ```r
@@ -262,11 +265,11 @@ for(i in 2:50){
 ```
 
 ```
-## Mon Nov 20 19:01:32 2017 ---- at k =  10/536
-## Mon Nov 20 19:01:35 2017 ---- at k =  20/536
-## Mon Nov 20 19:01:38 2017 ---- at k =  30/536
-## Mon Nov 20 19:01:47 2017 ---- at k =  40/536
-## Mon Nov 20 19:02:02 2017 ---- at k =  50/536
+## Mon Nov 27 15:22:52 2017 ---- at k =  10/536
+## Mon Nov 27 15:22:54 2017 ---- at k =  20/536
+## Mon Nov 27 15:22:58 2017 ---- at k =  30/536
+## Mon Nov 27 15:23:04 2017 ---- at k =  40/536
+## Mon Nov 27 15:23:16 2017 ---- at k =  50/536
 ```
 
 ```r
@@ -291,7 +294,7 @@ cluster_labels_pam <- data.frame(Sample = cell.name,
 if(PEAKS == TRUE){
   mc_fit <- Mclust(as.matrix(pc_cluster_bacteria))
 } else {
-  mc_fit <- Mclust(pc_cluster_bacteria, G = c(1:10))
+  mc_fit <- Mclust(pc_cluster_bacteria, G = 13)
 }
 
 # plot(fit) # plot results 
@@ -303,14 +306,14 @@ summary(mc_fit) # display the best model
 ## Gaussian finite mixture model fitted by EM algorithm 
 ## ----------------------------------------------------
 ## 
-## Mclust VII (spherical, varying volume) model with 10 components:
+## Mclust VII (spherical, varying volume) model with 13 components:
 ## 
 ##  log.likelihood   n   df     BIC     ICL
-##         1272825 536 3349 2524604 2524604
+##         1285302 536 4354 2543243 2543243
 ## 
 ## Clustering table:
-##  1  2  3  4  5  6  7  8  9 10 
-## 70 47 61 25 46 45 77 61 60 44
+##  1  2  3  4  5  6  7  8  9 10 11 12 13 
+## 37 49 26 20 36 17 41 75 55 59 43 34 44
 ```
 
 ```r
@@ -386,27 +389,27 @@ div_ram_pam <- Diversity_16S(OPU_mclust_table, R = 100, brea = FALSE,
 ```
 ## 	**WARNING** this functions assumes that rows are samples and columns
 ##       	are taxa in your phyloseq object, please verify.
-## Mon Nov 27 14:40:59 2017 	Using 3 cores for calculations
-## Mon Nov 27 14:40:59 2017	Calculating diversity for sample 1/9 --- lag rep1
-## Mon Nov 27 14:41:12 2017	Done with sample lag rep1
-## Mon Nov 27 14:41:12 2017	Calculating diversity for sample 2/9 --- lag rep2
-## Mon Nov 27 14:41:17 2017	Done with sample lag rep2
-## Mon Nov 27 14:41:17 2017	Calculating diversity for sample 3/9 --- lag rep3
-## Mon Nov 27 14:41:21 2017	Done with sample lag rep3
-## Mon Nov 27 14:41:21 2017	Calculating diversity for sample 4/9 --- log rep1
-## Mon Nov 27 14:41:25 2017	Done with sample log rep1
-## Mon Nov 27 14:41:25 2017	Calculating diversity for sample 5/9 --- log rep2
-## Mon Nov 27 14:41:29 2017	Done with sample log rep2
-## Mon Nov 27 14:41:29 2017	Calculating diversity for sample 6/9 --- log rep3
-## Mon Nov 27 14:41:33 2017	Done with sample log rep3
-## Mon Nov 27 14:41:33 2017	Calculating diversity for sample 7/9 --- stat rep1
-## Mon Nov 27 14:41:36 2017	Done with sample stat rep1
-## Mon Nov 27 14:41:36 2017	Calculating diversity for sample 8/9 --- stat rep2
-## Mon Nov 27 14:41:40 2017	Done with sample stat rep2
-## Mon Nov 27 14:41:40 2017	Calculating diversity for sample 9/9 --- stat rep3
-## Mon Nov 27 14:41:43 2017	Done with sample stat rep3
-## Mon Nov 27 14:41:43 2017 	Closing workers
-## Mon Nov 27 14:41:43 2017 	Done with all 9 samples
+## Mon Nov 27 15:23:47 2017 	Using 3 cores for calculations
+## Mon Nov 27 15:23:47 2017	Calculating diversity for sample 1/9 --- lag rep1
+## Mon Nov 27 15:24:00 2017	Done with sample lag rep1
+## Mon Nov 27 15:24:00 2017	Calculating diversity for sample 2/9 --- lag rep2
+## Mon Nov 27 15:24:04 2017	Done with sample lag rep2
+## Mon Nov 27 15:24:04 2017	Calculating diversity for sample 3/9 --- lag rep3
+## Mon Nov 27 15:24:07 2017	Done with sample lag rep3
+## Mon Nov 27 15:24:07 2017	Calculating diversity for sample 4/9 --- log rep1
+## Mon Nov 27 15:24:11 2017	Done with sample log rep1
+## Mon Nov 27 15:24:11 2017	Calculating diversity for sample 5/9 --- log rep2
+## Mon Nov 27 15:24:14 2017	Done with sample log rep2
+## Mon Nov 27 15:24:14 2017	Calculating diversity for sample 6/9 --- log rep3
+## Mon Nov 27 15:24:18 2017	Done with sample log rep3
+## Mon Nov 27 15:24:18 2017	Calculating diversity for sample 7/9 --- stat rep1
+## Mon Nov 27 15:24:21 2017	Done with sample stat rep1
+## Mon Nov 27 15:24:21 2017	Calculating diversity for sample 8/9 --- stat rep2
+## Mon Nov 27 15:24:24 2017	Done with sample stat rep2
+## Mon Nov 27 15:24:24 2017	Calculating diversity for sample 9/9 --- stat rep3
+## Mon Nov 27 15:24:27 2017	Done with sample stat rep3
+## Mon Nov 27 15:24:27 2017 	Closing workers
+## Mon Nov 27 15:24:27 2017 	Done with all 9 samples
 ```
 
 ```r
@@ -417,27 +420,27 @@ div_ram_mclust <- Diversity_16S(OPU_pam_table2, R = 100, brea = FALSE,
 ```
 ## 	**WARNING** this functions assumes that rows are samples and columns
 ##       	are taxa in your phyloseq object, please verify.
-## Mon Nov 27 14:41:44 2017 	Using 3 cores for calculations
-## Mon Nov 27 14:41:44 2017	Calculating diversity for sample 1/9 --- lag rep1
-## Mon Nov 27 14:41:58 2017	Done with sample lag rep1
-## Mon Nov 27 14:41:58 2017	Calculating diversity for sample 2/9 --- lag rep2
-## Mon Nov 27 14:42:02 2017	Done with sample lag rep2
-## Mon Nov 27 14:42:02 2017	Calculating diversity for sample 3/9 --- lag rep3
-## Mon Nov 27 14:42:05 2017	Done with sample lag rep3
-## Mon Nov 27 14:42:05 2017	Calculating diversity for sample 4/9 --- log rep1
-## Mon Nov 27 14:42:09 2017	Done with sample log rep1
-## Mon Nov 27 14:42:09 2017	Calculating diversity for sample 5/9 --- log rep2
-## Mon Nov 27 14:42:12 2017	Done with sample log rep2
-## Mon Nov 27 14:42:12 2017	Calculating diversity for sample 6/9 --- log rep3
-## Mon Nov 27 14:42:15 2017	Done with sample log rep3
-## Mon Nov 27 14:42:15 2017	Calculating diversity for sample 7/9 --- stat rep1
-## Mon Nov 27 14:42:18 2017	Done with sample stat rep1
-## Mon Nov 27 14:42:18 2017	Calculating diversity for sample 8/9 --- stat rep2
-## Mon Nov 27 14:42:21 2017	Done with sample stat rep2
-## Mon Nov 27 14:42:21 2017	Calculating diversity for sample 9/9 --- stat rep3
-## Mon Nov 27 14:42:24 2017	Done with sample stat rep3
-## Mon Nov 27 14:42:24 2017 	Closing workers
-## Mon Nov 27 14:42:24 2017 	Done with all 9 samples
+## Mon Nov 27 15:24:28 2017 	Using 3 cores for calculations
+## Mon Nov 27 15:24:28 2017	Calculating diversity for sample 1/9 --- lag rep1
+## Mon Nov 27 15:24:39 2017	Done with sample lag rep1
+## Mon Nov 27 15:24:39 2017	Calculating diversity for sample 2/9 --- lag rep2
+## Mon Nov 27 15:24:42 2017	Done with sample lag rep2
+## Mon Nov 27 15:24:42 2017	Calculating diversity for sample 3/9 --- lag rep3
+## Mon Nov 27 15:24:45 2017	Done with sample lag rep3
+## Mon Nov 27 15:24:45 2017	Calculating diversity for sample 4/9 --- log rep1
+## Mon Nov 27 15:24:48 2017	Done with sample log rep1
+## Mon Nov 27 15:24:48 2017	Calculating diversity for sample 5/9 --- log rep2
+## Mon Nov 27 15:24:51 2017	Done with sample log rep2
+## Mon Nov 27 15:24:51 2017	Calculating diversity for sample 6/9 --- log rep3
+## Mon Nov 27 15:24:54 2017	Done with sample log rep3
+## Mon Nov 27 15:24:54 2017	Calculating diversity for sample 7/9 --- stat rep1
+## Mon Nov 27 15:24:57 2017	Done with sample stat rep1
+## Mon Nov 27 15:24:57 2017	Calculating diversity for sample 8/9 --- stat rep2
+## Mon Nov 27 15:25:00 2017	Done with sample stat rep2
+## Mon Nov 27 15:25:00 2017	Calculating diversity for sample 9/9 --- stat rep3
+## Mon Nov 27 15:25:03 2017	Done with sample stat rep3
+## Mon Nov 27 15:25:03 2017 	Closing workers
+## Mon Nov 27 15:25:03 2017 	Done with all 9 samples
 ```
 
 ```r
@@ -497,6 +500,8 @@ print(p_ram_div_mclust)
 ```
 
 <img src="Figures/cached/calculate-pheno-div-ram-2.png" style="display: block; margin: auto;" />
+
+
 
 # Contrast analysis
 ## Hyperspec normalized  
@@ -777,9 +782,9 @@ fs_div <- Diversity_rf(fs, param = param, R.b = 100, R = 100, cleanFCS = FALSE,
 
 ```
 ## --- parameters are already normalized at: 1
-## Mon Nov 27 14:42:35 2017 --- Using 3 cores for calculations
-## Mon Nov 27 14:46:49 2017 --- Closing workers
-## Mon Nov 27 14:46:49 2017 --- Alpha diversity metrics (D0,D1,D2) have been computed after 100 bootstraps
+## Mon Nov 27 15:25:19 2017 --- Using 3 cores for calculations
+## Mon Nov 27 15:29:08 2017 --- Closing workers
+## Mon Nov 27 15:29:08 2017 --- Alpha diversity metrics (D0,D1,D2) have been computed after 100 bootstraps
 ## -----------------------------------------------------------------------------------------------------
 ## 
 ```

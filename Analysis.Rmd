@@ -79,7 +79,7 @@ We will start with the hyperspec processed spectr:
 
 ```{r determine-clusters, fig.width = 7, fig.height= 6, dpi = 500, warning=FALSE}
 # Choose if you want to run PCA prior to clustering
-PCA <- TRUE
+PCA <- FALSE
 
 if(PCA == TRUE){
   # Perform PCA to reduce number of features in fingerprint
@@ -114,9 +114,9 @@ cluster_labels_pam <- data.frame(Sample = names(clusters_bacteria$clustering),
                                       cluster_label = clusters_bacteria$clustering)
 
 # Method 2: the Mclust( ) function in the mclust package selects the optimal model according to BIC for EM initialized by hierarchical clustering for parameterized Gaussian mixture models.
-# BIC = mclustBIC(pc_cluster_bacteria$spc, G = c(1:10), modeNames = c("VVI"))
-# plot(BIC)
-mc_fit <- Mclust(pc_cluster_bacteria, G = c(1:10))
+BIC = mclustBIC(pc_cluster_bacteria$spc, G = c(1:20))
+plot(BIC);lines(x = c(13, 13), y = c(0, 10e6), col = "red", lty = 2)
+mc_fit <- Mclust(pc_cluster_bacteria, G = 13)
 
 # plot(fit) # plot results 
 summary(mc_fit) # display the best model
@@ -229,7 +229,7 @@ cluster_labels_pam <- data.frame(Sample = cell.name,
 if(PEAKS == TRUE){
   mc_fit <- Mclust(as.matrix(pc_cluster_bacteria))
 } else {
-  mc_fit <- Mclust(pc_cluster_bacteria, G = c(1:10))
+  mc_fit <- Mclust(pc_cluster_bacteria, G = 13)
 }
 
 # plot(fit) # plot results 
@@ -351,6 +351,10 @@ p_ram_div_mclust <- div_ram_merged %>% filter(method == "mclust") %>%
   ylab(expression("Phenotypic diversity - D2 (Raman)"))
 
 print(p_ram_div_mclust)
+```
+
+```{r  calculate-pheno-beta-div-ram, fig.width = 7, fig.height= 6, dpi = 500, warning=FALSE}
+
 ```
 
 # Contrast analysis
