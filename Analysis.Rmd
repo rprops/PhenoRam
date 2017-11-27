@@ -353,7 +353,10 @@ print(v.mq)
 
 # Flow cytometry data
 
-```{r  FCM-analysis, fig.width = 10, fig.height= 6, dpi = 500, warning=FALSE}
+### Alpha diversity analysis  
+
+
+```{r  FCM-analysis-1, fig.width = 7, fig.height= 6, dpi = 500, warning=FALSE}
 # Import data in FCS format
 fs <- flowCore::read.flowSet(path = "./FCSfiles", pattern = ".fcs")
 
@@ -367,16 +370,119 @@ meta_fs <- data.frame(Sample = flowCore::sampleNames(fs),
 meta_fs$Dilution <- as.numeric(gsub(".fcs", "", meta_fs$Dilution))
 
 # Transform data with asinh
+# Select phenotypic features of interest and transform parameters
+fs <- flowCore::transform(fs,`FL1-H`=asinh(`FL1-H`), 
+                                   `SSC-H`=asinh(`SSC-H`), 
+                                   `FL3-H`=asinh(`FL3-H`), 
+                                   `FSC-H`=asinh(`FSC-H`))
+param=c("FL1-H", "FL3-H","SSC-H","FSC-H")
 
 # Denoise data
+### Create a PolygonGate for denoising the dataset
+### Define coordinates for gate in sqrcut1 in format: c(x,x,x,x,y,y,y,y)
+sqrcut1 <- matrix(c(7.75,7.75,14,14,3,7.75,14,3),ncol=2, nrow=4)
+colnames(sqrcut1) <- c("FL1-H","FL3-H")
+polyGate1 <- polygonGate(.gate=sqrcut1, filterId = "Total Cells")
+
+###  Gating quality check
+xyplot(`FL3-H` ~ `FL1-H`, data=fs[1], filter=polyGate1,
+       scales=list(y=list(limits=c(0,14)),
+                   x=list(limits=c(6,16))),
+       axis = axis.default, nbin=125, 
+       par.strip.text=list(col="white", font=2, cex=2), smooth=FALSE)
+
+### Isolate only the cellular information based on the polyGate1
+fs <- Subset(fs, polyGate1)
+
+#Normalize
+summary <- fsApply(x = fs, FUN = function(x) apply(x, 2, max), use.exprs = TRUE)
+maxval <- max(summary[,9])
+mytrans <- function(x) x/maxval
+fs <- transform(fs,`FL1-H`=mytrans(`FL1-H`),
+                                  `FL3-H`=mytrans(`FL3-H`), 
+                                  `SSC-H`=mytrans(`SSC-H`),
+                                  `FSC-H`=mytrans(`FSC-H`))
 
 # Calculate phenotypic diversity
-## Plot alpha diversity vs growht phase
+fs_div <- Diversity_rf(fs, param = param, R.b = 100, R = 100, cleanFCS = FALSE,
+                       parallel = TRUE, ncores = 3)
 
+## Plot alpha diversity vs growth phase
+fs_div <- dplyr::left_join(fs_div, meta_fs, by = c("Sample_names"="Sample"))
+
+p_fs_div <- ggplot(fs_div, aes(x = GrowthPhase, y = D2, fill = GrowthPhase))+
+  geom_point(shape = 21, size = 4)+
+  geom_boxplot(alpha = 0.4)+
+  ggplot2::theme_bw()+
+     theme(axis.title=element_text(size=16), strip.text=element_text(size=16),
+        legend.title=element_text(size=15),legend.text=element_text(size=14),
+        axis.text = element_text(size=14),title=element_text(size=20),
+        axis.text.x = element_text(angle = 45, hjust = 1),
+        strip.background=element_rect(fill=adjustcolor("lightgray",0.2))
+        #,panel.grid.major = element_blank(), panel.grid.minor = element_blank()
+        )+
+  scale_fill_brewer(palette = "Accent")+
+  geom_errorbar(aes(ymin = D2 - sd.D2, ymax = D2 + sd.D2), width = 0.025)+
+  guides(fill = FALSE)+
+  ylab(expression("Phenotypic diversity - D2"))
+
+
+print(p_fs_div)
+```
+
+### Contrast analysis  
+
+```{r  FCM-analysis-2, fig.width = 10, fig.height= 6, dpi = 500, warning=FALSE}
 # Calculate fingerprint
+fbasis <- flowBasis(fs, param, nbin=128, 
+                   bw=0.01,normalize=function(x) x)
 
+# Calculate contrasts
+fp_c_lag_log <- fp_contrasts(fbasis, comp1 = meta_fs$GrowthPhase=="lag", comp2 = 
+               meta_fs$GrowthPhase=="log", thresh = 0.05)
+fp_c_lag_stat <- fp_contrasts(fbasis, comp1 = meta_fs$GrowthPhase=="lag", comp2 = 
+               meta_fs$GrowthPhase=="stat", thresh = 0.05)
+fp_c_log_stat <- fp_contrasts(fbasis, comp1 = meta_fs$GrowthPhase=="log", comp2 = 
+               meta_fs$GrowthPhase=="stat", thresh = 0.05)
+
+fp_c_merge <- data.frame(rbind(fp_c_lag_log, fp_c_lag_stat, fp_c_log_stat),
+                         Comparison = c(rep("lag-log", nrow(fp_c_lag_log)),
+                                        rep("lag-stat", nrow(fp_c_lag_stat)),
+                                        rep("log-stat", nrow(fp_c_log_stat))))
+# Plot contrasts
+v.fp_c <- ggplot2::ggplot(fp_c_merge, ggplot2::aes(x = FL1.H, y = FL3.H, fill = Density, 
+                                                   z = Density))+
+  geom_tile(aes(fill=Density)) + 
+  geom_point(colour="gray", alpha=0.7)+
+  scale_fill_distiller(palette="RdYlBu", na.value="white") + 
+  stat_contour(aes(fill=..level..), geom="polygon", binwidth=0.1)+
+  theme_bw()+
+  # geom_line()+
+  facet_grid(.~Comparison)+
+  # scale_x_continuous(breaks = seq(600,1800,200), labels = seq(600,1800,200))+
+  theme(axis.title=element_text(size=16), strip.text=element_text(size=16),
+        legend.title=element_text(size=15),legend.text=element_text(size=14),
+        axis.text = element_text(size=14),title=element_text(size=20),
+        axis.text.x = element_text(angle = 45, hjust = 1),
+        strip.background=element_rect(fill=adjustcolor("lightgray",0.2))
+        #,panel.grid.major = element_blank(), panel.grid.minor = element_blank()
+        )+
+  labs(x="Green fluorescence intensity (a.u.)", y="Red fluorescence intensity (a.u.)")
+
+print(v.fp_c)
+```
+
+### Beta diversity analysis
+
+```{r  FCM-analysis-3, fig.width = 7, fig.height= 6, dpi = 500, warning=FALSE}
 # Calculate beta diversity
+beta.div <- beta_div_fcm(fbasis, ord.type="PCoA")
+
+# Plot ordination
+plot_beta_fcm(beta.div, color = meta_fs$GrowthPhase, labels="Growth phase") + 
+  theme_bw() +
+  geom_point(size = 8, alpha = 0.5)+
+  ggtitle("")
 
 # Juxtaposition with beta-diversity based on Raman data
-
 ```
