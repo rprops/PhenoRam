@@ -350,3 +350,33 @@ v.mq <- ggplot2::ggplot(ram.mq_merged, ggplot2::aes(x = Wavenumber, y = Density,
 
 print(v.mq)
 ```
+
+# Flow cytometry data
+
+```{r  FCM-analysis, fig.width = 10, fig.height= 6, dpi = 500, warning=FALSE}
+# Import data in FCS format
+fs <- flowCore::read.flowSet(path = "./FCSfiles", pattern = ".fcs")
+
+# Extract metadata from sample names
+meta_fs <- do.call(rbind, strsplit(flowCore::sampleNames(fs), " "))[,2]
+meta_fs <- data.frame(Sample = flowCore::sampleNames(fs),
+                      Organism = do.call(rbind, strsplit(meta_fs, "_"))[,1],
+                      GrowthPhase = do.call(rbind, strsplit(meta_fs, "_"))[,2],
+                      Replicate= do.call(rbind, strsplit(meta_fs, "_"))[,3],
+                      Dilution= do.call(rbind, strsplit(meta_fs, "_"))[,4])
+meta_fs$Dilution <- as.numeric(gsub(".fcs", "", meta_fs$Dilution))
+
+# Transform data with asinh
+
+# Denoise data
+
+# Calculate phenotypic diversity
+## Plot alpha diversity vs growht phase
+
+# Calculate fingerprint
+
+# Calculate beta diversity
+
+# Juxtaposition with beta-diversity based on Raman data
+
+```
