@@ -28,7 +28,8 @@ knitr::opts_chunk$set(eval = TRUE,
                       engine = "R", # Chunks will always have R code, unless noted
                       error = TRUE,
                       fig.path="Figures/cached/",  # Set the figure options
-                      fig.align = "center"
+                      fig.align = "center",
+                      dev.args=list(bg='transparent')
                       )
 ```
 
@@ -40,6 +41,8 @@ library("mclust")
 library("plyr")
 library("dplyr")
 library("gridExtra")
+library("tidyr")
+library("phyloseq")
 library("ggplot2")
 library("gridExtra")
 library("fpc")
@@ -274,6 +277,82 @@ print(p2)
 
 ```
 
+# PhenoRam diversity
+```{r  calculate-pheno-div-ram, fig.width = 7, fig.height= 6, dpi = 500, warning=FALSE}
+# Format PAM clusters into otu tables
+OPU_pam_table <- OPU_mq_merged %>% filter(method == "PAM") %>% select(c("Sample","OPU","Freq")) %>% tidyr::spread(OPU, Freq)
+rownames(OPU_pam_table) <- OPU_pam_table$Sample
+OPU_pam_table <- OPU_pam_table[, -1]
+OPU_pam_tax <- as.matrix(data.frame(OPU = colnames(OPU_pam_table)))
+rownames(OPU_pam_tax) <- OPU_pam_tax[,1]
+OPU_pam_table2 <- phyloseq(otu_table(OPU_pam_table, taxa_are_rows = FALSE),
+                           tax_table(OPU_pam_tax))
+
+# Format Mclust clusters into otu tables
+OPU_mclust_table <- OPU_mq_merged %>% filter(method == "Mclust") %>% select(c("Sample","OPU","Freq")) %>% tidyr::spread(OPU, Freq)
+rownames(OPU_mclust_table) <- OPU_mclust_table$Sample
+OPU_mclust_table <- OPU_mclust_table[, -1]
+OPU_mclust_tax <- as.matrix(data.frame(OPU = colnames(OPU_mclust_table)))
+rownames(OPU_mclust_tax) <- OPU_mclust_tax[,1]
+OPU_mclust_table <- phyloseq(otu_table(OPU_mclust_table, taxa_are_rows = FALSE),
+                           tax_table(OPU_mclust_tax))
+
+div_ram_pam <- Diversity_16S(OPU_mclust_table, R = 100, brea = FALSE, 
+                             parallel = TRUE, ncores = 3)
+div_ram_mclust <- Diversity_16S(OPU_pam_table2, R = 100, brea = FALSE, 
+                             parallel = TRUE, ncores = 3)
+
+div_ram_merged <- data.frame(Sample = rep(rownames(div_ram_pam),2),
+                             rbind(div_ram_pam, div_ram_mclust),
+                             method = c(rep("pam", nrow(div_ram_pam)),
+                                        rep("mclust", nrow(div_ram_mclust)))
+                             )
+div_ram_merged <- div_ram_merged[, -c(4:7)]
+div_ram_merged$Sample <- as.character(div_ram_merged$Sample)
+
+# Merge with metadata
+div_ram_merged$GrowthPhase <- do.call(rbind, strsplit(div_ram_merged$Sample, " "))[,1]
+
+# Plot results
+p_ram_div_pam <- div_ram_merged %>% filter(method == "pam") %>% 
+  ggplot(aes(x = GrowthPhase, y = D2, fill = GrowthPhase))+
+  geom_point(shape = 21, size = 4)+
+  geom_boxplot(alpha = 0.4)+
+  ggplot2::theme_bw()+
+     theme(axis.title=element_text(size=16), strip.text=element_text(size=16),
+        legend.title=element_text(size=15),legend.text=element_text(size=14),
+        axis.text = element_text(size=14),title=element_text(size=20),
+        axis.text.x = element_text(angle = 45, hjust = 1),
+        strip.background=element_rect(fill=adjustcolor("lightgray",0.2))
+        #,panel.grid.major = element_blank(), panel.grid.minor = element_blank()
+        )+
+  scale_fill_brewer(palette = "Accent")+
+  geom_errorbar(aes(ymin = D2 - sd.D2, ymax = D2 + sd.D2), width = 0.025)+
+  guides(fill = FALSE)+
+  ylab(expression("Phenotypic diversity - D2 (Raman)"))
+
+print(p_ram_div_pam)
+
+p_ram_div_mclust <- div_ram_merged %>% filter(method == "mclust") %>% 
+  ggplot(aes(x = GrowthPhase, y = D2, fill = GrowthPhase))+
+  geom_point(shape = 21, size = 4)+
+  geom_boxplot(alpha = 0.4)+
+  ggplot2::theme_bw()+
+     theme(axis.title=element_text(size=16), strip.text=element_text(size=16),
+        legend.title=element_text(size=15),legend.text=element_text(size=14),
+        axis.text = element_text(size=14),title=element_text(size=20),
+        axis.text.x = element_text(angle = 45, hjust = 1),
+        strip.background=element_rect(fill=adjustcolor("lightgray",0.2))
+        #,panel.grid.major = element_blank(), panel.grid.minor = element_blank()
+        )+
+  scale_fill_brewer(palette = "Accent")+
+  geom_errorbar(aes(ymin = D2 - sd.D2, ymax = D2 + sd.D2), width = 0.025)+
+  guides(fill = FALSE)+
+  ylab(expression("Phenotypic diversity - D2 (Raman)"))
+
+print(p_ram_div_mclust)
+```
+
 # Contrast analysis
 ## Hyperspec normalized  
 
@@ -356,7 +435,7 @@ print(v.mq)
 ### Alpha diversity analysis  
 
 
-```{r  FCM-analysis-1, fig.width = 7, fig.height= 6, dpi = 500, warning=FALSE}
+```{r  FCM-analysis-1, fig.width = 10, fig.height= 6, dpi = 500, warning=FALSE}
 # Import data in FCS format
 fs <- flowCore::read.flowSet(path = "./FCSfiles", pattern = ".fcs")
 
@@ -424,10 +503,10 @@ p_fs_div <- ggplot(fs_div, aes(x = GrowthPhase, y = D2, fill = GrowthPhase))+
   scale_fill_brewer(palette = "Accent")+
   geom_errorbar(aes(ymin = D2 - sd.D2, ymax = D2 + sd.D2), width = 0.025)+
   guides(fill = FALSE)+
-  ylab(expression("Phenotypic diversity - D2"))
+  ylab(expression("Phenotypic diversity - D2 (FCM)"))
 
-
-print(p_fs_div)
+# Compare FCM diversity (left hand side) with Raman diversity (right hand side)
+grid.arrange(p_fs_div, p_ram_div_mclust, ncol = 2)
 ```
 
 ### Contrast analysis  

@@ -13,6 +13,8 @@ library("mclust")
 library("plyr")
 library("dplyr")
 library("gridExtra")
+library("tidyr")
+library("phyloseq")
 library("ggplot2")
 library("gridExtra")
 library("fpc")
@@ -356,6 +358,146 @@ print(p2)
 
 <img src="Figures/cached/plot-clusters-mq-1.png" style="display: block; margin: auto;" />
 
+# PhenoRam diversity
+
+```r
+# Format PAM clusters into otu tables
+OPU_pam_table <- OPU_mq_merged %>% filter(method == "PAM") %>% select(c("Sample","OPU","Freq")) %>% tidyr::spread(OPU, Freq)
+rownames(OPU_pam_table) <- OPU_pam_table$Sample
+OPU_pam_table <- OPU_pam_table[, -1]
+OPU_pam_tax <- as.matrix(data.frame(OPU = colnames(OPU_pam_table)))
+rownames(OPU_pam_tax) <- OPU_pam_tax[,1]
+OPU_pam_table2 <- phyloseq(otu_table(OPU_pam_table, taxa_are_rows = FALSE),
+                           tax_table(OPU_pam_tax))
+
+# Format Mclust clusters into otu tables
+OPU_mclust_table <- OPU_mq_merged %>% filter(method == "Mclust") %>% select(c("Sample","OPU","Freq")) %>% tidyr::spread(OPU, Freq)
+rownames(OPU_mclust_table) <- OPU_mclust_table$Sample
+OPU_mclust_table <- OPU_mclust_table[, -1]
+OPU_mclust_tax <- as.matrix(data.frame(OPU = colnames(OPU_mclust_table)))
+rownames(OPU_mclust_tax) <- OPU_mclust_tax[,1]
+OPU_mclust_table <- phyloseq(otu_table(OPU_mclust_table, taxa_are_rows = FALSE),
+                           tax_table(OPU_mclust_tax))
+
+div_ram_pam <- Diversity_16S(OPU_mclust_table, R = 100, brea = FALSE, 
+                             parallel = TRUE, ncores = 3)
+```
+
+```
+## 	**WARNING** this functions assumes that rows are samples and columns
+##       	are taxa in your phyloseq object, please verify.
+## Mon Nov 27 14:40:59 2017 	Using 3 cores for calculations
+## Mon Nov 27 14:40:59 2017	Calculating diversity for sample 1/9 --- lag rep1
+## Mon Nov 27 14:41:12 2017	Done with sample lag rep1
+## Mon Nov 27 14:41:12 2017	Calculating diversity for sample 2/9 --- lag rep2
+## Mon Nov 27 14:41:17 2017	Done with sample lag rep2
+## Mon Nov 27 14:41:17 2017	Calculating diversity for sample 3/9 --- lag rep3
+## Mon Nov 27 14:41:21 2017	Done with sample lag rep3
+## Mon Nov 27 14:41:21 2017	Calculating diversity for sample 4/9 --- log rep1
+## Mon Nov 27 14:41:25 2017	Done with sample log rep1
+## Mon Nov 27 14:41:25 2017	Calculating diversity for sample 5/9 --- log rep2
+## Mon Nov 27 14:41:29 2017	Done with sample log rep2
+## Mon Nov 27 14:41:29 2017	Calculating diversity for sample 6/9 --- log rep3
+## Mon Nov 27 14:41:33 2017	Done with sample log rep3
+## Mon Nov 27 14:41:33 2017	Calculating diversity for sample 7/9 --- stat rep1
+## Mon Nov 27 14:41:36 2017	Done with sample stat rep1
+## Mon Nov 27 14:41:36 2017	Calculating diversity for sample 8/9 --- stat rep2
+## Mon Nov 27 14:41:40 2017	Done with sample stat rep2
+## Mon Nov 27 14:41:40 2017	Calculating diversity for sample 9/9 --- stat rep3
+## Mon Nov 27 14:41:43 2017	Done with sample stat rep3
+## Mon Nov 27 14:41:43 2017 	Closing workers
+## Mon Nov 27 14:41:43 2017 	Done with all 9 samples
+```
+
+```r
+div_ram_mclust <- Diversity_16S(OPU_pam_table2, R = 100, brea = FALSE, 
+                             parallel = TRUE, ncores = 3)
+```
+
+```
+## 	**WARNING** this functions assumes that rows are samples and columns
+##       	are taxa in your phyloseq object, please verify.
+## Mon Nov 27 14:41:44 2017 	Using 3 cores for calculations
+## Mon Nov 27 14:41:44 2017	Calculating diversity for sample 1/9 --- lag rep1
+## Mon Nov 27 14:41:58 2017	Done with sample lag rep1
+## Mon Nov 27 14:41:58 2017	Calculating diversity for sample 2/9 --- lag rep2
+## Mon Nov 27 14:42:02 2017	Done with sample lag rep2
+## Mon Nov 27 14:42:02 2017	Calculating diversity for sample 3/9 --- lag rep3
+## Mon Nov 27 14:42:05 2017	Done with sample lag rep3
+## Mon Nov 27 14:42:05 2017	Calculating diversity for sample 4/9 --- log rep1
+## Mon Nov 27 14:42:09 2017	Done with sample log rep1
+## Mon Nov 27 14:42:09 2017	Calculating diversity for sample 5/9 --- log rep2
+## Mon Nov 27 14:42:12 2017	Done with sample log rep2
+## Mon Nov 27 14:42:12 2017	Calculating diversity for sample 6/9 --- log rep3
+## Mon Nov 27 14:42:15 2017	Done with sample log rep3
+## Mon Nov 27 14:42:15 2017	Calculating diversity for sample 7/9 --- stat rep1
+## Mon Nov 27 14:42:18 2017	Done with sample stat rep1
+## Mon Nov 27 14:42:18 2017	Calculating diversity for sample 8/9 --- stat rep2
+## Mon Nov 27 14:42:21 2017	Done with sample stat rep2
+## Mon Nov 27 14:42:21 2017	Calculating diversity for sample 9/9 --- stat rep3
+## Mon Nov 27 14:42:24 2017	Done with sample stat rep3
+## Mon Nov 27 14:42:24 2017 	Closing workers
+## Mon Nov 27 14:42:24 2017 	Done with all 9 samples
+```
+
+```r
+div_ram_merged <- data.frame(Sample = rep(rownames(div_ram_pam),2),
+                             rbind(div_ram_pam, div_ram_mclust),
+                             method = c(rep("pam", nrow(div_ram_pam)),
+                                        rep("mclust", nrow(div_ram_mclust)))
+                             )
+div_ram_merged <- div_ram_merged[, -c(4:7)]
+div_ram_merged$Sample <- as.character(div_ram_merged$Sample)
+
+# Merge with metadata
+div_ram_merged$GrowthPhase <- do.call(rbind, strsplit(div_ram_merged$Sample, " "))[,1]
+
+# Plot results
+p_ram_div_pam <- div_ram_merged %>% filter(method == "pam") %>% 
+  ggplot(aes(x = GrowthPhase, y = D2, fill = GrowthPhase))+
+  geom_point(shape = 21, size = 4)+
+  geom_boxplot(alpha = 0.4)+
+  ggplot2::theme_bw()+
+     theme(axis.title=element_text(size=16), strip.text=element_text(size=16),
+        legend.title=element_text(size=15),legend.text=element_text(size=14),
+        axis.text = element_text(size=14),title=element_text(size=20),
+        axis.text.x = element_text(angle = 45, hjust = 1),
+        strip.background=element_rect(fill=adjustcolor("lightgray",0.2))
+        #,panel.grid.major = element_blank(), panel.grid.minor = element_blank()
+        )+
+  scale_fill_brewer(palette = "Accent")+
+  geom_errorbar(aes(ymin = D2 - sd.D2, ymax = D2 + sd.D2), width = 0.025)+
+  guides(fill = FALSE)+
+  ylab(expression("Phenotypic diversity - D2 (Raman)"))
+
+print(p_ram_div_pam)
+```
+
+<img src="Figures/cached/calculate-pheno-div-ram-1.png" style="display: block; margin: auto;" />
+
+```r
+p_ram_div_mclust <- div_ram_merged %>% filter(method == "mclust") %>% 
+  ggplot(aes(x = GrowthPhase, y = D2, fill = GrowthPhase))+
+  geom_point(shape = 21, size = 4)+
+  geom_boxplot(alpha = 0.4)+
+  ggplot2::theme_bw()+
+     theme(axis.title=element_text(size=16), strip.text=element_text(size=16),
+        legend.title=element_text(size=15),legend.text=element_text(size=14),
+        axis.text = element_text(size=14),title=element_text(size=20),
+        axis.text.x = element_text(angle = 45, hjust = 1),
+        strip.background=element_rect(fill=adjustcolor("lightgray",0.2))
+        #,panel.grid.major = element_blank(), panel.grid.minor = element_blank()
+        )+
+  scale_fill_brewer(palette = "Accent")+
+  geom_errorbar(aes(ymin = D2 - sd.D2, ymax = D2 + sd.D2), width = 0.025)+
+  guides(fill = FALSE)+
+  ylab(expression("Phenotypic diversity - D2 (Raman)"))
+
+print(p_ram_div_mclust)
+```
+
+<img src="Figures/cached/calculate-pheno-div-ram-2.png" style="display: block; margin: auto;" />
+
 # Contrast analysis
 ## Hyperspec normalized  
 
@@ -635,9 +777,9 @@ fs_div <- Diversity_rf(fs, param = param, R.b = 100, R = 100, cleanFCS = FALSE,
 
 ```
 ## --- parameters are already normalized at: 1
-## Mon Nov 27 14:01:21 2017 --- Using 3 cores for calculations
-## Mon Nov 27 14:04:52 2017 --- Closing workers
-## Mon Nov 27 14:04:52 2017 --- Alpha diversity metrics (D0,D1,D2) have been computed after 100 bootstraps
+## Mon Nov 27 14:42:35 2017 --- Using 3 cores for calculations
+## Mon Nov 27 14:46:49 2017 --- Closing workers
+## Mon Nov 27 14:46:49 2017 --- Alpha diversity metrics (D0,D1,D2) have been computed after 100 bootstraps
 ## -----------------------------------------------------------------------------------------------------
 ## 
 ```
@@ -660,10 +802,10 @@ p_fs_div <- ggplot(fs_div, aes(x = GrowthPhase, y = D2, fill = GrowthPhase))+
   scale_fill_brewer(palette = "Accent")+
   geom_errorbar(aes(ymin = D2 - sd.D2, ymax = D2 + sd.D2), width = 0.025)+
   guides(fill = FALSE)+
-  ylab(expression("Phenotypic diversity - D2"))
+  ylab(expression("Phenotypic diversity - D2 (FCM)"))
 
-
-print(p_fs_div)
+# Compare FCM diversity (left hand side) with Raman diversity (right hand side)
+grid.arrange(p_fs_div, p_ram_div_mclust, ncol = 2)
 ```
 
 <img src="Figures/cached/FCM-analysis-1-2.png" style="display: block; margin: auto;" />
