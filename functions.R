@@ -224,3 +224,60 @@ ram_contrast <- function(hyprs, comp1, comp2, plot = TRUE){
   }
   return(results)
 }
+
+# This function takes as input a hyperspec or maldiquant object and 
+# clusters the cells using partition around medioids (PAM) optimized through
+# the silhouette index and model-based clustering using MClust optimized
+# through the BIC criterion.
+ram_clust <- function(hs.x, PCA = FALSE, ram_object = "hs",
+                      PCA.var = 0.9, nclust = 50){
+  
+  if(ram_object == "mq"){
+    
+  } else{
+    # Do PCA if requested
+    if(PCA == TRUE){
+      # Perform PCA to reduce number of features in fingerprint
+      hs.x <- prcomp(hs.x)
+      
+      # Only retain PC which explain 90% of the variance
+      nr_pc <- min(which((cumsum(vegan::eigenvals(hs.x)/sum(vegan::eigenvals(hs.x)))>PCA.var) == TRUE))
+      pc_cluster <- hs.x$x[, 1:nr_pc]
+    } else {
+      pc_cluster <- hs.norm
+    }
+    # Start PAM clustering
+      # Evaluate number of robust clusters by means of silhouette index
+      # We limit the search to "nclust" clusters
+    tmp.si <- c()
+    for(i in 2:nclust){
+      if(i%%10 == 0) cat(date(), paste0("---- at k =  ", i, "/",  nrow(pc_cluster), "\n"))
+      tmp.si[i] <- cluster::pam(pc_cluster, k = i)$silinfo$avg.width
+    }
+    nr_clusters_bacteria <- which(tmp.si == max(tmp.si, na.rm = TRUE))
+    
+      # Plot Silhouette index distribution
+    plot(tmp.si, type = "l", ylab = "Silhouette index", 
+         xlab = "Number of clusters")
+    lines(x = c(nr_clusters_bacteria, nr_clusters_bacteria), 
+          y = c(0,100), lty = 2, col = "red")
+    
+      # Cluster samples and export cluster labels
+    clusters_x <- cluster::pam(pc_cluster_bacteria, k = nr_clusters_bacteria)
+    
+      # Extract cluster labels
+    cluster_labels_pam <- data.frame(Sample = names(clusters_x$clustering),
+                                     cluster_label = clusters_x$clustering)
+    
+    
+  }
+  
+  # Perform PAM clustering
+  
+  # Perform MClust clustering
+  
+  # Join results
+  
+  # Return dataframe (long format)
+  return(df_results)
+}
