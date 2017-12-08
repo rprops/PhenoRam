@@ -1,6 +1,22 @@
-# PhenoRam analysis
-Cristina Garcia Timmermans & Ruben Props  
-Today  
+---
+title: "PhenoRam analysis"
+author: "Cristina Garcia Timmermans & Ruben Props"
+date: "Today"
+output:
+  html_document:
+    code_folding: show
+    highlight: haddock
+    keep_md: yes
+    theme: united
+    toc: yes
+    toc_float:
+      collapsed: no
+      smooth_scroll: yes
+      toc_depth: 2
+    css: report_styles.css
+editor_options: 
+  chunk_output_type: console
+---
 
 
 
@@ -42,175 +58,98 @@ my.settings <- list(
 ```
 
 # Cluster analysis
-## A. Hyperspec-normalized spectra
-We will start with the hyperspec processed spectr:  
+<!-- ## A. Hyperspec-normalized spectra -->
+<!-- We will start with the hyperspec processed spectr:   -->
 
-* Select number of stable clusters in data set
-* Map back to original samples
-* Calculate phenotypic diversity in each sample using Hill numbers
+<!-- * Select number of stable clusters in data set -->
+<!-- * Map back to original samples -->
+<!-- * Calculate phenotypic diversity in each sample using Hill numbers -->
 
+<!-- ```{r determine-clusters, fig.width = 7, fig.height= 6, dpi = 500, warning=FALSE} -->
+<!-- # Choose if you want to run PCA prior to clustering -->
+<!-- PCA <- FALSE -->
 
-```r
-# Choose if you want to run PCA prior to clustering
-PCA <- FALSE
+<!-- if(PCA == TRUE){ -->
+<!--   # Perform PCA to reduce number of features in fingerprint -->
+<!--   pca_bacteria <- prcomp(hs.norm) -->
 
-if(PCA == TRUE){
-  # Perform PCA to reduce number of features in fingerprint
-  pca_bacteria <- prcomp(hs.norm)
+<!--   # Only retain PC which explain 90% of the variance -->
+<!--   thresh <- 0.9 -->
+<!--   nr_pc_bacteria <- min(which((cumsum(vegan::eigenvals(pca_bacteria)/sum(vegan::eigenvals(pca_bacteria)))>thresh) == TRUE)) -->
+<!--   pc_cluster_bacteria <- pca_bacteria$x[, 1:nr_pc_bacteria] -->
+<!-- } else { -->
+<!--   pc_cluster_bacteria <- hs.norm -->
+<!-- } -->
 
-  # Only retain PC which explain 90% of the variance
-  thresh <- 0.9
-  nr_pc_bacteria <- min(which((cumsum(vegan::eigenvals(pca_bacteria)/sum(vegan::eigenvals(pca_bacteria)))>thresh) == TRUE))
-  pc_cluster_bacteria <- pca_bacteria$x[, 1:nr_pc_bacteria]
-} else {
-  pc_cluster_bacteria <- hs.norm
-}
+<!-- # Evaluate number of robust clusters by means of silhouette index -->
+<!-- # We limit the search to 50 clusters -->
+<!-- tmp.si <- c() -->
+<!-- for(i in 2:50){ -->
+<!--   if(i%%10 == 0) cat(date(), paste0("---- at k =  ", i, "/",  nrow(pc_cluster_bacteria), "\n")) -->
+<!--   tmp.si[i] <- pam(pc_cluster_bacteria, k = i)$silinfo$avg.width -->
+<!-- } -->
+<!-- nr_clusters_bacteria <- which(tmp.si == max(tmp.si, na.rm = TRUE)) -->
 
-# Evaluate number of robust clusters by means of silhouette index
-# We limit the search to 50 clusters
-tmp.si <- c()
-for(i in 2:50){
-  if(i%%10 == 0) cat(date(), paste0("---- at k =  ", i, "/",  nrow(pc_cluster_bacteria), "\n"))
-  tmp.si[i] <- pam(pc_cluster_bacteria, k = i)$silinfo$avg.width
-}
-```
+<!-- # Plot Silhouette index distribution -->
+<!-- plot(tmp.si, type = "l", ylab = "Silhouette index",  -->
+<!--      xlab = "Number of clusters") -->
 
-```
-## Loading required package: hyperSpec
-```
+<!-- # Cluster samples and export cluster labels -->
+<!-- clusters_bacteria <- pam(pc_cluster_bacteria, k = nr_clusters_bacteria) -->
 
-```
-## Package hyperSpec, version 0.99-20171005
-## 
-## To get started, try
-##    vignette ("hyperspec")
-##    package?hyperSpec 
-##    vignette (package = "hyperSpec")
-## 
-## If you use this package please cite it appropriately.
-##    citation("hyperSpec")
-## will give you the correct reference.
-## 
-## The project homepage is http://hyperspec.r-forge.r-project.org
-```
+<!-- # Extract cluster labels -->
+<!-- cluster_labels_pam <- data.frame(Sample = names(clusters_bacteria$clustering), -->
+<!--                                       cluster_label = clusters_bacteria$clustering) -->
 
-```
-## 
-## Attaching package: 'hyperSpec'
-```
+<!-- # Method 2: the Mclust( ) function in the mclust package selects the optimal model according to BIC for EM initialized by hierarchical clustering for parameterized Gaussian mixture models. -->
+<!-- BIC = mclustBIC(pc_cluster_bacteria$spc, G = c(1:20)) -->
+<!-- plot(BIC);lines(x = c(13, 13), y = c(0, 10e6), col = "red", lty = 2) -->
+<!-- mc_fit <- Mclust(pc_cluster_bacteria, G = 13) -->
 
-```
-## The following object is masked from 'package:dplyr':
-## 
-##     collapse
-```
+<!-- # plot(fit) # plot results  -->
+<!-- summary(mc_fit) # display the best model -->
 
-```
-## The following object is masked from 'package:plyr':
-## 
-##     empty
-```
+<!-- cluster_labels_mc <- data.frame(Sample = names(clusters_bacteria$clustering), -->
+<!--                                       cluster_label = mc_fit$classification) -->
 
-```
-## Mon Nov 27 15:19:59 2017 ---- at k =  10/536
-## Mon Nov 27 15:20:03 2017 ---- at k =  20/536
-## Mon Nov 27 15:20:06 2017 ---- at k =  30/536
-## Mon Nov 27 15:20:12 2017 ---- at k =  40/536
-## Mon Nov 27 15:20:26 2017 ---- at k =  50/536
-```
+<!-- # To compare both clustering approaches: -->
+<!-- # cluster.stats(dist(hs.norm), mc_fit$classification, clusters_bacteria$clustering) -->
 
-```r
-nr_clusters_bacteria <- which(tmp.si == max(tmp.si, na.rm = TRUE))
+<!-- # Extract count table (i.e. "operational phenotypic unit table") for each sample -->
+<!-- OPU_hs_pam <- data.frame(table(cluster_labels_pam)) -->
+<!-- # print(OPU_hs_pam) -->
 
-# Plot Silhouette index distribution
-plot(tmp.si, type = "l", ylab = "Silhouette index", 
-     xlab = "Number of clusters")
-```
+<!-- OPU_hs_mc <- data.frame(table(cluster_labels_mc)) -->
+<!-- # print(OPU_hs_mc) -->
 
-<img src="Figures/cached/determine-clusters-1.png" style="display: block; margin: auto;" />
+<!-- # Merge cluster outputs in long format df -->
+<!-- OPU_hs_merged <- rbind(OPU_hs_pam, OPU_hs_mc) -->
+<!-- OPU_hs_merged <- data.frame(OPU_hs_merged, method = -->
+<!--                               c(rep("PAM", nrow(OPU_hs_pam)), -->
+<!--                                 rep("Mclust", nrow(OPU_hs_mc))),  -->
+<!--                             replicate = do.call(rbind, strsplit(as.character(OPU_hs_merged$Sample), " "))[, 2], -->
+<!--                             growth_phase = do.call(rbind, strsplit(as.character(OPU_hs_merged$Sample), " "))[, 1]) -->
+<!-- colnames(OPU_hs_merged)[colnames(OPU_hs_merged) == "cluster_label"] <- "OPU" -->
+<!-- ``` -->
 
-```r
-# Cluster samples and export cluster labels
-clusters_bacteria <- pam(pc_cluster_bacteria, k = nr_clusters_bacteria)
+<!-- # Plot OPU table -->
+<!-- ```{r plot-clusters, fig.width = 7, fig.height= 6, dpi = 500, warning=FALSE} -->
+<!-- # Plot according to metadata -->
+<!-- p1 <- ggplot(OPU_hs_merged, aes(x = replicate, y = Freq, fill = OPU))+ -->
+<!--   geom_bar(stat = "identity")+ -->
+<!--   scale_fill_brewer(palette = "Paired")+ -->
+<!--   theme_bw()+ -->
+<!--   facet_grid(method ~ growth_phase, scales = "free")+ -->
+<!--    theme(axis.title=element_text(size=16), strip.text=element_text(size=16), -->
+<!--         legend.title=element_text(size=15),legend.text=element_text(size=14), -->
+<!--         axis.text = element_text(size=14),title=element_text(size=20), -->
+<!--         axis.text.x = element_text(angle = 45, hjust = 1), -->
+<!--         strip.background=element_rect(fill=adjustcolor("lightgray",0.2)) -->
+<!--         #,panel.grid.major = element_blank(), panel.grid.minor = element_blank() -->
+<!--         ) -->
 
-# Extract cluster labels
-cluster_labels_pam <- data.frame(Sample = names(clusters_bacteria$clustering),
-                                      cluster_label = clusters_bacteria$clustering)
-
-# Method 2: the Mclust( ) function in the mclust package selects the optimal model according to BIC for EM initialized by hierarchical clustering for parameterized Gaussian mixture models.
-BIC = mclustBIC(pc_cluster_bacteria$spc, G = c(1:20))
-plot(BIC);lines(x = c(13, 13), y = c(0, 10e6), col = "red", lty = 2)
-```
-
-<img src="Figures/cached/determine-clusters-2.png" style="display: block; margin: auto;" />
-
-```r
-mc_fit <- Mclust(pc_cluster_bacteria, G = 13)
-
-# plot(fit) # plot results 
-summary(mc_fit) # display the best model
-```
-
-```
-## ----------------------------------------------------
-## Gaussian finite mixture model fitted by EM algorithm 
-## ----------------------------------------------------
-## 
-## Mclust VII (spherical, varying volume) model with 13 components:
-## 
-##  log.likelihood   n   df     BIC     ICL
-##         1285302 536 4354 2543243 2543243
-## 
-## Clustering table:
-##  1  2  3  4  5  6  7  8  9 10 11 12 13 
-## 37 49 26 20 36 17 41 75 55 59 43 34 44
-```
-
-```r
-cluster_labels_mc <- data.frame(Sample = names(clusters_bacteria$clustering),
-                                      cluster_label = mc_fit$classification)
-
-# To compare both clustering approaches:
-# cluster.stats(dist(hs.norm), mc_fit$classification, clusters_bacteria$clustering)
-
-# Extract count table (i.e. "operational phenotypic unit table") for each sample
-OPU_hs_pam <- data.frame(table(cluster_labels_pam))
-# print(OPU_hs_pam)
-
-OPU_hs_mc <- data.frame(table(cluster_labels_mc))
-# print(OPU_hs_mc)
-
-# Merge cluster outputs in long format df
-OPU_hs_merged <- rbind(OPU_hs_pam, OPU_hs_mc)
-OPU_hs_merged <- data.frame(OPU_hs_merged, method =
-                              c(rep("PAM", nrow(OPU_hs_pam)),
-                                rep("Mclust", nrow(OPU_hs_mc))), 
-                            replicate = do.call(rbind, strsplit(as.character(OPU_hs_merged$Sample), " "))[, 2],
-                            growth_phase = do.call(rbind, strsplit(as.character(OPU_hs_merged$Sample), " "))[, 1])
-colnames(OPU_hs_merged)[colnames(OPU_hs_merged) == "cluster_label"] <- "OPU"
-```
-
-# Plot OPU table
-
-```r
-# Plot according to metadata
-p1 <- ggplot(OPU_hs_merged, aes(x = replicate, y = Freq, fill = OPU))+
-  geom_bar(stat = "identity")+
-  scale_fill_brewer(palette = "Paired")+
-  theme_bw()+
-  facet_grid(method ~ growth_phase, scales = "free")+
-   theme(axis.title=element_text(size=16), strip.text=element_text(size=16),
-        legend.title=element_text(size=15),legend.text=element_text(size=14),
-        axis.text = element_text(size=14),title=element_text(size=20),
-        axis.text.x = element_text(angle = 45, hjust = 1),
-        strip.background=element_rect(fill=adjustcolor("lightgray",0.2))
-        #,panel.grid.major = element_blank(), panel.grid.minor = element_blank()
-        )
-
-print(p1)
-```
-
-<img src="Figures/cached/plot-clusters-1.png" style="display: block; margin: auto;" />
+<!-- print(p1) -->
+<!-- ``` -->
 
 ## B. Maldiquant-normalized spectra  
 
@@ -908,3 +847,158 @@ plot_beta_fcm(beta.div, color = meta_fs$GrowthPhase, labels="Growth phase") +
 ```r
 # Juxtaposition with beta-diversity based on Raman data
 ```
+
+# tSNE
+
+## Flow cytometry
+
+
+```r
+# Calculate the dissimilarity matrix
+dist_fbasis_sample <- dist(fbasis@basis)
+tsne_fbasis <- tsne::tsne(dist_fbasis_sample, 
+                          perplexity = 5)
+```
+
+```
+## sigma summary: Min. : 12.5709245723508 |1st Qu. : 19.2135377420559 |Median : 20.9792132965026 |Mean : 20.9191497359823 |3rd Qu. : 22.082868101704 |Max. : 28.1623460431449 |
+```
+
+```
+## Epoch: Iteration #100 error is: 16.2166585199963
+```
+
+```
+## Epoch: Iteration #200 error is: 0.800916250981897
+```
+
+```
+## Epoch: Iteration #300 error is: 0.521594437296171
+```
+
+```
+## Epoch: Iteration #400 error is: 0.494656031369735
+```
+
+```
+## Epoch: Iteration #500 error is: 0.480375937539916
+```
+
+```
+## Epoch: Iteration #600 error is: 0.343160688367551
+```
+
+```
+## Epoch: Iteration #700 error is: 0.227939522084319
+```
+
+```
+## Epoch: Iteration #800 error is: 0.106205994334686
+```
+
+```
+## Epoch: Iteration #900 error is: 0.0898148877257923
+```
+
+```
+## Epoch: Iteration #1000 error is: 0.0660148814083378
+```
+
+```r
+tsne_fbasis <- data.frame(tsne_fbasis, Sample = rownames(fbasis@basis))
+colnames(tsne_fbasis)[1:2] <- c("Axis1", "Axis2")
+tsne_fbasis <- dplyr::left_join(tsne_fbasis, meta_fs, by = "Sample")
+
+p_tsne_fbasis <- ggplot2::ggplot(tsne_fbasis, ggplot2::aes(x = Axis1, y = Axis2, 
+        fill = GrowthPhase)) + 
+  ggplot2::geom_point(alpha = 0.7, 
+        size = 8, shape = 21, colour = "black") + 
+  ggplot2::scale_fill_manual(values = c("#a65628", "red", 
+            "#ffae19", "#4daf4a", "#1919ff", "darkorchid3", "magenta")) +
+  ggplot2::labs(x = paste0("Axis1"), y = paste0("Axis2"))+
+  theme_bw()+
+    theme(axis.title=element_text(size=16), strip.text=element_text(size=16),
+        legend.title=element_text(size=15),legend.text=element_text(size=14),
+        axis.text = element_text(size=14),title=element_text(size=20),
+        strip.background=element_rect(fill=adjustcolor("lightgray",0.2)))
+
+print(p_tsne_fbasis)
+```
+
+<img src="Figures/cached/tsne-1-1.png" style="display: block; margin: auto;" />
+
+## Raman data
+
+
+```r
+# At single cell level
+dist_ram_cells <- dist(hs.mq@data)
+tsne_ram.c <- tsne::tsne(dist_ram_cells)
+```
+
+```
+## sigma summary: Min. : 0.0131363067079677 |1st Qu. : 0.0200191227308468 |Median : 0.021848832655061 |Mean : 0.0239405053832849 |3rd Qu. : 0.025763593149787 |Max. : 0.0505763424606676 |
+```
+
+```
+## Epoch: Iteration #100 error is: 10.3473032362903
+```
+
+```
+## Epoch: Iteration #200 error is: 0.276972705489419
+```
+
+```
+## Epoch: Iteration #300 error is: 0.234388809023767
+```
+
+```
+## Epoch: Iteration #400 error is: 0.218658452883787
+```
+
+```
+## Epoch: Iteration #500 error is: 0.213552120191546
+```
+
+```
+## Epoch: Iteration #600 error is: 0.210866926308676
+```
+
+```
+## Epoch: Iteration #700 error is: 0.209103898440317
+```
+
+```
+## Epoch: Iteration #800 error is: 0.207774749990583
+```
+
+```
+## Epoch: Iteration #900 error is: 0.206720669680325
+```
+
+```
+## Epoch: Iteration #1000 error is: 0.205859746088686
+```
+
+```r
+tsne_ram.c <- data.frame(tsne_ram.c, GrowthPhase = do.call(rbind, strsplit(cell.name, " "))[,1], replicate = do.call(rbind, strsplit(cell.name, " "))[,2])
+colnames(tsne_ram.c)[1:2] <- c("Axis1", "Axis2")
+
+p_tsne_ram.c <- ggplot2::ggplot(tsne_ram.c, ggplot2::aes(x = Axis1, y = Axis2, 
+        fill = GrowthPhase, shape = Replicate)) + 
+    ggplot2::scale_fill_manual(values = c("#a65628", "red", 
+            "#ffae19", "#4daf4a", "#1919ff", "darkorchid3", "magenta")) +
+  ggplot2::geom_point(alpha = 0.7, 
+        size = 4, colour = "black") + 
+  scale_shape_manual(values = c(21,22,24))+
+  ggplot2::labs(x = paste0("Axis1"), y = paste0("Axis2"))+
+  theme_bw()+
+  theme(axis.title=element_text(size=16), strip.text=element_text(size=16),
+        legend.title=element_text(size=15),legend.text=element_text(size=14),
+        axis.text = element_text(size=14),title=element_text(size=20),
+        strip.background=element_rect(fill=adjustcolor("lightgray",0.2)))
+
+print(p_tsne_ram.c)
+```
+
+<img src="Figures/cached/tsne-2-1.png" style="display: block; margin: auto;" />
