@@ -229,55 +229,72 @@ ram_contrast <- function(hyprs, comp1, comp2, plot = TRUE){
 # clusters the cells using partition around medioids (PAM) optimized through
 # the silhouette index and model-based clustering using MClust optimized
 # through the BIC criterion.
-ram_clust <- function(hs.x, PCA = FALSE, ram_object = "hs",
+ram_clust <- function(sp.x, PCA = FALSE, ram_object = c("hs", "mq"),
                       PCA.var = 0.9, nclust = 50){
   
+  # Get cell labels
+  cell.labels <- rownames(sp.x)
+  
+  # Special formatting for maldiquant data
   if(ram_object == "mq"){
-    
-  } else{
-    # Do PCA if requested
-    if(PCA == TRUE){
-      # Perform PCA to reduce number of features in fingerprint
-      hs.x <- prcomp(hs.x)
-      
-      # Only retain PC which explain 90% of the variance
-      nr_pc <- min(which((cumsum(vegan::eigenvals(hs.x)/sum(vegan::eigenvals(hs.x)))>PCA.var) == TRUE))
-      pc_cluster <- hs.x$x[, 1:nr_pc]
-    } else {
-      pc_cluster <- hs.norm
+    wv_mq <- mass(sp.x[[1]])
+    cell.labels <- paste(do.call(rbind, lapply(mq.norm, FUN = function(x) metaData(x)$name)),
+                         seq(1:length(mq.norm)), sep = ".")
+    matrix.spectra <- matrix(nrow=length(mq.norm), ncol = length(wv_mq))
+    for (i in 1:length(mq.norm)){
+      matrix.spectra[i,] <- intensity(sp.x[[i]])
     }
-    # Start PAM clustering
-      # Evaluate number of robust clusters by means of silhouette index
-      # We limit the search to "nclust" clusters
-    tmp.si <- c()
-    for(i in 2:nclust){
-      if(i%%10 == 0) cat(date(), paste0("---- at k =  ", i, "/",  nrow(pc_cluster), "\n"))
-      tmp.si[i] <- cluster::pam(pc_cluster, k = i)$silinfo$avg.width
-    }
-    nr_clusters_bacteria <- which(tmp.si == max(tmp.si, na.rm = TRUE))
-    
-      # Plot Silhouette index distribution
-    plot(tmp.si, type = "l", ylab = "Silhouette index", 
-         xlab = "Number of clusters")
-    lines(x = c(nr_clusters_bacteria, nr_clusters_bacteria), 
-          y = c(0,100), lty = 2, col = "red")
-    
-      # Cluster samples and export cluster labels
-    clusters_x <- cluster::pam(pc_cluster_bacteria, k = nr_clusters_bacteria)
-    
-      # Extract cluster labels
-    cluster_labels_pam <- data.frame(Sample = names(clusters_x$clustering),
-                                     cluster_label = clusters_x$clustering)
-    
-    
+    sp.x <- new("hyperSpec", spc = matrix.spectra, wavelength = wv_mq, labels = cell.labels)
+    rownames(sp.x) <- cell.labels
   }
   
-  # Perform PAM clustering
+  # Do PCA if requested
+  if(PCA == TRUE){
+    # Perform PCA to reduce number of features in fingerprint
+    hs.x <- prcomp(sp.x)
+    # Only retain PC which explain 90% of the variance
+    nr_pc <- min(which((cumsum(vegan::eigenvals(hs.x)/sum(vegan::eigenvals(hs.x)))>PCA.var) == TRUE))
+    pc_cluster <- hs.x$x[, 1:nr_pc]
+  } else {
+    pc_cluster <- sp.x
+  }
+  # Start PAM clustering
+  # Evaluate number of robust clusters by means of silhouette index
+  # We limit the search to "nclust" clusters
+  tmp.si <- c()
+  for(i in 2:nclust){
+    if(i%%10 == 0) cat(date(), paste0("---- at k =  ", i, "/",  nrow(pc_cluster), "\n"))
+    tmp.si[i] <- cluster::pam(pc_cluster, k = i)$silinfo$avg.width
+  }
+  nr_clusters_bacteria <- which(tmp.si == max(tmp.si, na.rm = TRUE))
   
-  # Perform MClust clustering
+  # Plot Silhouette index distribution
+  plot(tmp.si, type = "l", ylab = "Silhouette index",
+       xlab = "Number of clusters")
+  lines(x = c(nr_clusters_bacteria, nr_clusters_bacteria),
+        y = c(0,100), lty = 2, col = "red")
   
-  # Join results
+  # Cluster samples and export cluster labels
+  clusters_x <- cluster::pam(pc_cluster, k = nr_clusters_bacteria)
   
-  # Return dataframe (long format)
-  return(df_results)
+  # Extract cluster labels
+  cluster_labels_pam <- data.frame(Sample_label = rownames(sp.x),
+                                   Cluster_label = clusters_x$clustering)
+  
+  # Start MClust
+  mc_fit <- Mclust(as.matrix(pc_cluster))
+  summary(mc_fit) # display the best model
+  
+  cluster_labels_mc <- data.frame(Sample_label =  rownames(sp.x),
+                                  Cluster_label = mc_fit$classification)
+  
+  # Merge cluster outputs in long format df
+  OPU_mq_merged <- rbind(cluster_labels_pam, cluster_labels_mc)
+  OPU_mq_merged <- data.frame(OPU_mq_merged, method =
+                                c(rep("PAM", nrow(cluster_labels_pam)),
+                                  rep("Mclust", nrow(cluster_labels_mc)))
+                              )
+  colnames(OPU_mq_merged)[colnames(OPU_mq_merged) == "cluster_label"] <- "OPU"
+  
+  return(OPU_mq_merged)
 }
