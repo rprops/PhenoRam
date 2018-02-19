@@ -488,7 +488,7 @@ fs <- transform(fs,`FL1-H`=mytrans(`FL1-H`),
                                   `FSC-H`=mytrans(`FSC-H`))
 
 # Calculate phenotypic diversity
-fs <- FCS_resample(fs, sample = 60, replace =)
+# fs <- FCS_resample(fs, sample = 60, replace = TRUE)
 fs_div <- Diversity_rf(fs, param = param, R.b = 100, R = 100, cleanFCS = FALSE,
                        parallel = TRUE, ncores = 3)
 
