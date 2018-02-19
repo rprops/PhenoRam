@@ -43,6 +43,7 @@ library("dplyr")
 library("gridExtra")
 library("tidyr")
 library("phyloseq")
+library("readr")
 library("ggplot2")
 library("gridExtra")
 library("fpc")
@@ -487,6 +488,7 @@ fs <- transform(fs,`FL1-H`=mytrans(`FL1-H`),
                                   `FSC-H`=mytrans(`FSC-H`))
 
 # Calculate phenotypic diversity
+fs <- FCS_resample(fs, sample = 60, replace =)
 fs_div <- Diversity_rf(fs, param = param, R.b = 100, R = 100, cleanFCS = FALSE,
                        parallel = TRUE, ncores = 3)
 
@@ -623,5 +625,26 @@ p_tsne_ram.c <- ggplot2::ggplot(tsne_ram.c, ggplot2::aes(x = Axis1, y = Axis2,
         strip.background=element_rect(fill=adjustcolor("lightgray",0.2)))
 
 print(p_tsne_ram.c)
+
+```
+
+# Ramanome data
+```{r ramanome-1, fig.width = 10, fig.height= 6, dpi = 500, warning=FALSE}
+# Import ramanome data
+df.Ramanone <- read_csv("./External_data/Ramanome.zip")
+mat.Ramanome <- as.matrix(df.Ramanone[, - c(1:4)])
+
+# df.Ramanone <- reshape2::melt(df.Ramanone)
+hs.ramanome <- new("hyperSpec", spc = mat.Ramanome, 
+                    wavelength = as.numeric(as.character(colnames(mat.Ramanome))),
+                    labels = df.Ramanone$sampleID)
+rownames(hs.ramanome) <- df.Ramanone$sampleID
+
+# Format data into maldiquant/hyperspec object
+
+# Run preprocessing
+
+# 
+test <- ram_clust(hs.ramanome, ram_object = "hs", nclust = 20, PCA = TRUE)
 
 ```

@@ -279,14 +279,14 @@ ram_clust <- function(sp.x, PCA = FALSE, ram_object = c("hs", "mq"),
   
   # Extract cluster labels
   cluster_labels_pam <- data.frame(Sample_label = rownames(sp.x),
-                                   Cluster_label = clusters_x$clustering)
+                                   OPU = clusters_x$clustering)
   
   # Start MClust
   mc_fit <- Mclust(as.matrix(pc_cluster))
   summary(mc_fit) # display the best model
   
   cluster_labels_mc <- data.frame(Sample_label =  rownames(sp.x),
-                                  Cluster_label = mc_fit$classification)
+                                  OPU = mc_fit$classification)
   
   # Merge cluster outputs in long format df
   OPU_mq_merged <- rbind(cluster_labels_pam, cluster_labels_mc)
@@ -294,7 +294,5 @@ ram_clust <- function(sp.x, PCA = FALSE, ram_object = c("hs", "mq"),
                                 c(rep("PAM", nrow(cluster_labels_pam)),
                                   rep("Mclust", nrow(cluster_labels_mc)))
                               )
-  colnames(OPU_mq_merged)[colnames(OPU_mq_merged) == "cluster_label"] <- "OPU"
-  
   return(OPU_mq_merged)
 }
