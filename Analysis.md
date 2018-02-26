@@ -31,6 +31,7 @@ library("dplyr")
 library("gridExtra")
 library("tidyr")
 library("phyloseq")
+library("readr")
 library("ggplot2")
 library("gridExtra")
 library("fpc")
@@ -42,6 +43,7 @@ library("cluster")
 library("grid")
 library("egg")
 library("MALDIquant")
+library("hyperSpec")
 library("reshape2")
 library("caret") # for cross validation
 library("foreach") # for parallelization
@@ -164,13 +166,7 @@ for (i in 1:length(mq.norm)){
   matrix.spectra[i,] <- intensity(mq.norm[[i]])
 }
 hs.mq <- new("hyperSpec", spc = matrix.spectra, wavelength = wv_mq, labels = cell.name)
-```
 
-```
-## Error in getClass(Class, where = topenv(parent.frame())): "hyperSpec" is not a defined class
-```
-
-```r
 # Choose if you want to run PCA prior to clustering
 PCA <- FALSE
 PEAKS <- FALSE
@@ -199,13 +195,7 @@ if(PCA == TRUE){
 } else {
   pc_cluster_bacteria <- hs.mq
 }
-```
 
-```
-## Error in eval(expr, envir, enclos): object 'hs.mq' not found
-```
-
-```r
 # Evaluate number of robust clusters by means of silhouette index
 # We limit the search to 50 clusters
 tmp.si <- c()
@@ -216,7 +206,11 @@ for(i in 2:50){
 ```
 
 ```
-## Error in pam(pc_cluster_bacteria, k = i): object 'pc_cluster_bacteria' not found
+## Tue Feb 20 11:48:53 2018 ---- at k =  10/536
+## Tue Feb 20 11:48:56 2018 ---- at k =  20/536
+## Tue Feb 20 11:49:01 2018 ---- at k =  30/536
+## Tue Feb 20 11:49:11 2018 ---- at k =  40/536
+## Tue Feb 20 11:49:29 2018 ---- at k =  50/536
 ```
 
 ```r
@@ -227,113 +221,64 @@ plot(tmp.si, type = "l", ylab = "Silhouette index",
      xlab = "Number of clusters")
 ```
 
-```
-## Error in plot.window(...): need finite 'xlim' values
-```
-
 <img src="Figures/cached/determine-clusters-mq-1.png" style="display: block; margin: auto;" />
 
 ```r
 # Cluster samples and export cluster labels
 clusters_bacteria <- pam(pc_cluster_bacteria, k = nr_clusters_bacteria)
-```
 
-```
-## Error in inherits(x, "dist"): object 'pc_cluster_bacteria' not found
-```
-
-```r
 # Extract cluster labels
 cluster_labels_pam <- data.frame(Sample = cell.name,
                                       cluster_label = clusters_bacteria$clustering)
-```
 
-```
-## Error in data.frame(Sample = cell.name, cluster_label = clusters_bacteria$clustering): object 'clusters_bacteria' not found
-```
-
-```r
 # Method 2: the Mclust( ) function in the mclust package selects the optimal model according to BIC for EM initialized by hierarchical clustering for parameterized Gaussian mixture models.
 if(PEAKS == TRUE){
   mc_fit <- Mclust(as.matrix(pc_cluster_bacteria))
 } else {
   mc_fit <- Mclust(pc_cluster_bacteria, G = 13)
 }
-```
 
-```
-## Error in is.data.frame(frame): object 'pc_cluster_bacteria' not found
-```
-
-```r
 # plot(fit) # plot results 
 summary(mc_fit) # display the best model
 ```
 
 ```
-## Error in summary(mc_fit): object 'mc_fit' not found
+## ----------------------------------------------------
+## Gaussian finite mixture model fitted by EM algorithm 
+## ----------------------------------------------------
+## 
+## Mclust EII (spherical, equal volume) model with 13 components:
+## 
+##  log.likelihood   n   df     BIC     ICL
+##         1250553 536 4342 2473821 2473821
+## 
+## Clustering table:
+##  1  2  3  4  5  6  7  8  9 10 11 12 13 
+## 93 85 84 25 49 81  1 60  1 53  2  1  1
 ```
 
 ```r
 cluster_labels_mc <- data.frame(Sample = cell.name,
                                       cluster_label = mc_fit$classification)
-```
 
-```
-## Error in data.frame(Sample = cell.name, cluster_label = mc_fit$classification): object 'mc_fit' not found
-```
-
-```r
 # To compare both clustering approaches:
 # cluster.stats(dist(hs.mq), mc_fit$classification, clusters_bacteria$clustering)
 
 # Extract count table (i.e. "operational phenotypic unit table") for each sample
 OPU_mq_pam <- data.frame(table(cluster_labels_pam))
-```
-
-```
-## Error in table(cluster_labels_pam): object 'cluster_labels_pam' not found
-```
-
-```r
 # print(OPU_hs_pam)
 
 OPU_mq_mc <- data.frame(table(cluster_labels_mc))
-```
-
-```
-## Error in table(cluster_labels_mc): object 'cluster_labels_mc' not found
-```
-
-```r
 # print(OPU_hs_mc)
 
 # Merge cluster outputs in long format df
 OPU_mq_merged <- rbind(OPU_mq_pam, OPU_mq_mc)
-```
-
-```
-## Error in rbind(OPU_mq_pam, OPU_mq_mc): object 'OPU_mq_pam' not found
-```
-
-```r
 OPU_mq_merged <- data.frame(OPU_mq_merged, method =
                               c(rep("PAM", nrow(OPU_mq_pam)),
                                 rep("Mclust", nrow(OPU_mq_mc))), 
                             replicate = do.call(rbind, strsplit(as.character(OPU_mq_merged$Sample), " "))[, 2],
                             growth_phase = do.call(rbind, strsplit(as.character(OPU_mq_merged$Sample), " "))[, 1])
-```
-
-```
-## Error in data.frame(OPU_mq_merged, method = c(rep("PAM", nrow(OPU_mq_pam)), : object 'OPU_mq_merged' not found
-```
-
-```r
 colnames(OPU_mq_merged)[colnames(OPU_mq_merged) == "cluster_label"] <- "OPU"
-```
-
-```
-## Error in colnames(OPU_mq_merged)[colnames(OPU_mq_merged) == "cluster_label"] <- "OPU": object 'OPU_mq_merged' not found
 ```
 
 # Plot OPU table
@@ -351,123 +296,33 @@ p2 <- ggplot(OPU_mq_merged, aes(x = replicate, y = Freq, fill = OPU))+
         strip.background=element_rect(fill=adjustcolor("lightgray",0.2))
         #,panel.grid.major = element_blank(), panel.grid.minor = element_blank()
         )
-```
 
-```
-## Error in ggplot(OPU_mq_merged, aes(x = replicate, y = Freq, fill = OPU)): object 'OPU_mq_merged' not found
-```
-
-```r
 print(p2)
 ```
 
-```
-## Error in print(p2): object 'p2' not found
-```
+<img src="Figures/cached/plot-clusters-mq-1.png" style="display: block; margin: auto;" />
 
 # PhenoRam diversity
 
 ```r
 # Format PAM clusters into otu tables
 OPU_pam_table <- OPU_mq_merged %>% filter(method == "PAM") %>% select(c("Sample","OPU","Freq")) %>% tidyr::spread(OPU, Freq)
-```
-
-```
-## Error in eval(lhs, parent, parent): object 'OPU_mq_merged' not found
-```
-
-```r
 rownames(OPU_pam_table) <- OPU_pam_table$Sample
-```
-
-```
-## Error in eval(expr, envir, enclos): object 'OPU_pam_table' not found
-```
-
-```r
 OPU_pam_table <- OPU_pam_table[, -1]
-```
-
-```
-## Error in eval(expr, envir, enclos): object 'OPU_pam_table' not found
-```
-
-```r
 OPU_pam_tax <- as.matrix(data.frame(OPU = colnames(OPU_pam_table)))
-```
-
-```
-## Error in colnames(OPU_pam_table): object 'OPU_pam_table' not found
-```
-
-```r
 rownames(OPU_pam_tax) <- OPU_pam_tax[,1]
-```
-
-```
-## Error in eval(expr, envir, enclos): object 'OPU_pam_tax' not found
-```
-
-```r
 OPU_pam_table2 <- phyloseq(otu_table(OPU_pam_table, taxa_are_rows = FALSE),
                            tax_table(OPU_pam_tax))
-```
 
-```
-## Error in otu_table(OPU_pam_table, taxa_are_rows = FALSE): object 'OPU_pam_table' not found
-```
-
-```r
 # Format Mclust clusters into otu tables
 OPU_mclust_table <- OPU_mq_merged %>% filter(method == "Mclust") %>% select(c("Sample","OPU","Freq")) %>% tidyr::spread(OPU, Freq)
-```
-
-```
-## Error in eval(lhs, parent, parent): object 'OPU_mq_merged' not found
-```
-
-```r
 rownames(OPU_mclust_table) <- OPU_mclust_table$Sample
-```
-
-```
-## Error in eval(expr, envir, enclos): object 'OPU_mclust_table' not found
-```
-
-```r
 OPU_mclust_table <- OPU_mclust_table[, -1]
-```
-
-```
-## Error in eval(expr, envir, enclos): object 'OPU_mclust_table' not found
-```
-
-```r
 OPU_mclust_tax <- as.matrix(data.frame(OPU = colnames(OPU_mclust_table)))
-```
-
-```
-## Error in colnames(OPU_mclust_table): object 'OPU_mclust_table' not found
-```
-
-```r
 rownames(OPU_mclust_tax) <- OPU_mclust_tax[,1]
-```
-
-```
-## Error in eval(expr, envir, enclos): object 'OPU_mclust_tax' not found
-```
-
-```r
 OPU_mclust_table <- phyloseq(otu_table(OPU_mclust_table, taxa_are_rows = FALSE),
                            tax_table(OPU_mclust_tax))
-```
 
-```
-## Error in otu_table(OPU_mclust_table, taxa_are_rows = FALSE): object 'OPU_mclust_table' not found
-```
-
-```r
 div_ram_pam <- Diversity_16S(OPU_mclust_table, R = 100, brea = FALSE, 
                              parallel = TRUE, ncores = 3)
 ```
@@ -475,10 +330,27 @@ div_ram_pam <- Diversity_16S(OPU_mclust_table, R = 100, brea = FALSE,
 ```
 ## 	**WARNING** this functions assumes that rows are samples and columns
 ##       	are taxa in your phyloseq object, please verify.
-```
-
-```
-## Error in phyloseq::nsamples(x): object 'OPU_mclust_table' not found
+## Tue Feb 20 11:50:32 2018 	Using 3 cores for calculations
+## Tue Feb 20 11:50:32 2018	Calculating diversity for sample 1/9 --- lag rep1
+## Tue Feb 20 11:50:42 2018	Done with sample lag rep1
+## Tue Feb 20 11:50:42 2018	Calculating diversity for sample 2/9 --- lag rep2
+## Tue Feb 20 11:50:45 2018	Done with sample lag rep2
+## Tue Feb 20 11:50:45 2018	Calculating diversity for sample 3/9 --- lag rep3
+## Tue Feb 20 11:50:48 2018	Done with sample lag rep3
+## Tue Feb 20 11:50:48 2018	Calculating diversity for sample 4/9 --- log rep1
+## Tue Feb 20 11:50:50 2018	Done with sample log rep1
+## Tue Feb 20 11:50:50 2018	Calculating diversity for sample 5/9 --- log rep2
+## Tue Feb 20 11:50:53 2018	Done with sample log rep2
+## Tue Feb 20 11:50:53 2018	Calculating diversity for sample 6/9 --- log rep3
+## Tue Feb 20 11:50:56 2018	Done with sample log rep3
+## Tue Feb 20 11:50:56 2018	Calculating diversity for sample 7/9 --- stat rep1
+## Tue Feb 20 11:50:59 2018	Done with sample stat rep1
+## Tue Feb 20 11:50:59 2018	Calculating diversity for sample 8/9 --- stat rep2
+## Tue Feb 20 11:51:01 2018	Done with sample stat rep2
+## Tue Feb 20 11:51:01 2018	Calculating diversity for sample 9/9 --- stat rep3
+## Tue Feb 20 11:51:04 2018	Done with sample stat rep3
+## Tue Feb 20 11:51:04 2018 	Closing workers
+## Tue Feb 20 11:51:04 2018 	Done with all 9 samples
 ```
 
 ```r
@@ -489,10 +361,27 @@ div_ram_mclust <- Diversity_16S(OPU_pam_table2, R = 100, brea = FALSE,
 ```
 ## 	**WARNING** this functions assumes that rows are samples and columns
 ##       	are taxa in your phyloseq object, please verify.
-```
-
-```
-## Error in phyloseq::nsamples(x): object 'OPU_pam_table2' not found
+## Tue Feb 20 11:51:05 2018 	Using 3 cores for calculations
+## Tue Feb 20 11:51:05 2018	Calculating diversity for sample 1/9 --- lag rep1
+## Tue Feb 20 11:51:15 2018	Done with sample lag rep1
+## Tue Feb 20 11:51:15 2018	Calculating diversity for sample 2/9 --- lag rep2
+## Tue Feb 20 11:51:17 2018	Done with sample lag rep2
+## Tue Feb 20 11:51:17 2018	Calculating diversity for sample 3/9 --- lag rep3
+## Tue Feb 20 11:51:20 2018	Done with sample lag rep3
+## Tue Feb 20 11:51:20 2018	Calculating diversity for sample 4/9 --- log rep1
+## Tue Feb 20 11:51:22 2018	Done with sample log rep1
+## Tue Feb 20 11:51:22 2018	Calculating diversity for sample 5/9 --- log rep2
+## Tue Feb 20 11:51:25 2018	Done with sample log rep2
+## Tue Feb 20 11:51:25 2018	Calculating diversity for sample 6/9 --- log rep3
+## Tue Feb 20 11:51:27 2018	Done with sample log rep3
+## Tue Feb 20 11:51:27 2018	Calculating diversity for sample 7/9 --- stat rep1
+## Tue Feb 20 11:51:30 2018	Done with sample stat rep1
+## Tue Feb 20 11:51:30 2018	Calculating diversity for sample 8/9 --- stat rep2
+## Tue Feb 20 11:51:33 2018	Done with sample stat rep2
+## Tue Feb 20 11:51:33 2018	Calculating diversity for sample 9/9 --- stat rep3
+## Tue Feb 20 11:51:36 2018	Done with sample stat rep3
+## Tue Feb 20 11:51:36 2018 	Closing workers
+## Tue Feb 20 11:51:36 2018 	Done with all 9 samples
 ```
 
 ```r
@@ -501,38 +390,12 @@ div_ram_merged <- data.frame(Sample = rep(rownames(div_ram_pam),2),
                              method = c(rep("pam", nrow(div_ram_pam)),
                                         rep("mclust", nrow(div_ram_mclust)))
                              )
-```
-
-```
-## Error in rownames(div_ram_pam): object 'div_ram_pam' not found
-```
-
-```r
 div_ram_merged <- div_ram_merged[, -c(4:7)]
-```
-
-```
-## Error in eval(expr, envir, enclos): object 'div_ram_merged' not found
-```
-
-```r
 div_ram_merged$Sample <- as.character(div_ram_merged$Sample)
-```
 
-```
-## Error in eval(expr, envir, enclos): object 'div_ram_merged' not found
-```
-
-```r
 # Merge with metadata
 div_ram_merged$GrowthPhase <- do.call(rbind, strsplit(div_ram_merged$Sample, " "))[,1]
-```
 
-```
-## Error in strsplit(div_ram_merged$Sample, " "): object 'div_ram_merged' not found
-```
-
-```r
 # Plot results
 p_ram_div_pam <- div_ram_merged %>% filter(method == "pam") %>% 
   ggplot(aes(x = GrowthPhase, y = D2, fill = GrowthPhase))+
@@ -550,19 +413,11 @@ p_ram_div_pam <- div_ram_merged %>% filter(method == "pam") %>%
   geom_errorbar(aes(ymin = D2 - sd.D2, ymax = D2 + sd.D2), width = 0.025)+
   guides(fill = FALSE)+
   ylab(expression("Phenotypic diversity - D2 (Raman)"))
-```
 
-```
-## Error in eval(lhs, parent, parent): object 'div_ram_merged' not found
-```
-
-```r
 print(p_ram_div_pam)
 ```
 
-```
-## Error in print(p_ram_div_pam): object 'p_ram_div_pam' not found
-```
+<img src="Figures/cached/calculate-pheno-div-ram-1.png" style="display: block; margin: auto;" />
 
 ```r
 p_ram_div_mclust <- div_ram_merged %>% filter(method == "mclust") %>% 
@@ -581,19 +436,11 @@ p_ram_div_mclust <- div_ram_merged %>% filter(method == "mclust") %>%
   geom_errorbar(aes(ymin = D2 - sd.D2, ymax = D2 + sd.D2), width = 0.025)+
   guides(fill = FALSE)+
   ylab(expression("Phenotypic diversity - D2 (Raman)"))
-```
 
-```
-## Error in eval(lhs, parent, parent): object 'div_ram_merged' not found
-```
-
-```r
 print(p_ram_div_mclust)
 ```
 
-```
-## Error in print(p_ram_div_mclust): object 'p_ram_div_mclust' not found
-```
+<img src="Figures/cached/calculate-pheno-div-ram-2.png" style="display: block; margin: auto;" />
 
 
 
@@ -716,7 +563,23 @@ ram.mq_lag_log <- ram_contrast(hs.mq, comp1 = c("lag rep1", "lag rep2", "lag rep
 ```
 
 ```
-## Error in ram_contrast(hs.mq, comp1 = c("lag rep1", "lag rep2", "lag rep3"), : object 'hs.mq' not found
+## -----------------------------------------------------------------------------------------------------
+##  
+## 	 Your cells are distributed over these samples:
+## 
+##  Samples
+##  lag rep1  lag rep2  lag rep3  log rep1  log rep2  log rep3 stat rep1 
+##        60        62        61        58        60        59        59 
+## stat rep2 stat rep3 
+##        56        61 
+## -----------------------------------------------------------------------------------------------------
+##  
+## 	 Returning contrasts between mean spectra for 183 cells of
+##  c("lag rep1", "lag rep2", "lag rep3")
+## 	 and 177 cells of
+##  c("log rep1", "log rep2", "log rep3")
+## -----------------------------------------------------------------------------------------------------
+## 
 ```
 
 ```r
@@ -725,7 +588,23 @@ ram.mq_lag_stat <- ram_contrast(hs.mq, comp1 = c("lag rep1", "lag rep2", "lag re
 ```
 
 ```
-## Error in ram_contrast(hs.mq, comp1 = c("lag rep1", "lag rep2", "lag rep3"), : object 'hs.mq' not found
+## -----------------------------------------------------------------------------------------------------
+##  
+## 	 Your cells are distributed over these samples:
+## 
+##  Samples
+##  lag rep1  lag rep2  lag rep3  log rep1  log rep2  log rep3 stat rep1 
+##        60        62        61        58        60        59        59 
+## stat rep2 stat rep3 
+##        56        61 
+## -----------------------------------------------------------------------------------------------------
+##  
+## 	 Returning contrasts between mean spectra for 183 cells of
+##  c("lag rep1", "lag rep2", "lag rep3")
+## 	 and 176 cells of
+##  c("stat rep1", "stat rep2", "stat rep3")
+## -----------------------------------------------------------------------------------------------------
+## 
 ```
 
 ```r
@@ -734,7 +613,23 @@ ram.mq_log_stat <- ram_contrast(hs.mq, comp1 = c("log rep1", "log rep2", "log re
 ```
 
 ```
-## Error in ram_contrast(hs.mq, comp1 = c("log rep1", "log rep2", "log rep3"), : object 'hs.mq' not found
+## -----------------------------------------------------------------------------------------------------
+##  
+## 	 Your cells are distributed over these samples:
+## 
+##  Samples
+##  lag rep1  lag rep2  lag rep3  log rep1  log rep2  log rep3 stat rep1 
+##        60        62        61        58        60        59        59 
+## stat rep2 stat rep3 
+##        56        61 
+## -----------------------------------------------------------------------------------------------------
+##  
+## 	 Returning contrasts between mean spectra for 177 cells of
+##  c("log rep1", "log rep2", "log rep3")
+## 	 and 176 cells of
+##  c("stat rep1", "stat rep2", "stat rep3")
+## -----------------------------------------------------------------------------------------------------
+## 
 ```
 
 ```r
@@ -742,13 +637,7 @@ ram.mq_merged <- data.frame(rbind(ram.mq_lag_log, ram.mq_lag_stat, ram.mq_log_st
                             Comparison = rep(c("lag-log", "lag-stat", "log-stat"), 
                                                each = nrow(ram.mq_lag_stat))
 )
-```
 
-```
-## Error in rbind(ram.mq_lag_log, ram.mq_lag_stat, ram.mq_log_stat): object 'ram.mq_lag_log' not found
-```
-
-```r
 v.mq <- ggplot2::ggplot(ram.mq_merged, ggplot2::aes(x = Wavenumber, y = Density, fill = Density))+
   ggplot2::geom_point(shape = 21, colour="black", alpha = 1.0,
                           size = 3)+
@@ -764,19 +653,11 @@ v.mq <- ggplot2::ggplot(ram.mq_merged, ggplot2::aes(x = Wavenumber, y = Density,
         strip.background=element_rect(fill=adjustcolor("lightgray",0.2))
         #,panel.grid.major = element_blank(), panel.grid.minor = element_blank()
         )
-```
 
-```
-## Error in ggplot2::ggplot(ram.mq_merged, ggplot2::aes(x = Wavenumber, y = Density, : object 'ram.mq_merged' not found
-```
-
-```r
 print(v.mq)
 ```
 
-```
-## Error in print(v.mq): object 'v.mq' not found
-```
+<img src="Figures/cached/plot-contrasts-mq-1.png" style="display: block; margin: auto;" />
 
 # Flow cytometry data
 
@@ -836,24 +717,16 @@ fs <- transform(fs,`FL1-H`=mytrans(`FL1-H`),
                                   `FSC-H`=mytrans(`FSC-H`))
 
 # Calculate phenotypic diversity
-fs <- FCS_resample(fs, sample = 60, replace = TRUE)
-```
-
-```
-## Your samples range between 10159 and 18172 cells
-## Your samples were randomly subsampled to 60 cells
-```
-
-```r
+# fs <- FCS_resample(fs, sample = 60, replace = TRUE)
 fs_div <- Diversity_rf(fs, param = param, R.b = 100, R = 100, cleanFCS = FALSE,
                        parallel = TRUE, ncores = 3)
 ```
 
 ```
-## --- parameters are already normalized at: 0.97244416959726
-## Fri Feb 09 13:49:28 2018 --- Using 3 cores for calculations
-## Fri Feb 09 13:51:40 2018 --- Closing workers
-## Fri Feb 09 13:51:40 2018 --- Alpha diversity metrics (D0,D1,D2) have been computed after 100 bootstraps
+## --- parameters are already normalized at: 1
+## Tue Feb 20 11:51:53 2018 --- Using 3 cores for calculations
+## Tue Feb 20 11:54:43 2018 --- Closing workers
+## Tue Feb 20 11:54:43 2018 --- Alpha diversity metrics (D0,D1,D2) have been computed after 100 bootstraps
 ## -----------------------------------------------------------------------------------------------------
 ## 
 ```
@@ -882,9 +755,7 @@ p_fs_div <- ggplot(fs_div, aes(x = GrowthPhase, y = D2, fill = GrowthPhase))+
 grid.arrange(p_fs_div, p_ram_div_mclust, ncol = 2)
 ```
 
-```
-## Error in arrangeGrob(...): object 'p_ram_div_mclust' not found
-```
+<img src="Figures/cached/FCM-analysis-1-2.png" style="display: block; margin: auto;" />
 
 ### Contrast analysis  
 
@@ -993,47 +864,47 @@ tsne_fbasis <- tsne::tsne(dist_fbasis_sample,
 ```
 
 ```
-## sigma summary: Min. : 11.2884164407159 |1st Qu. : 12.751773924976 |Median : 15.6206222524333 |Mean : 15.0842418719153 |3rd Qu. : 15.9164308061545 |Max. : 19.2646847974037 |
+## sigma summary: Min. : 12.5709245723508 |1st Qu. : 19.2135377420559 |Median : 20.9792132965026 |Mean : 20.9191497359823 |3rd Qu. : 22.082868101704 |Max. : 28.1623460431449 |
 ```
 
 ```
-## Epoch: Iteration #100 error is: 19.6905860389119
+## Epoch: Iteration #100 error is: 16.2166825704257
 ```
 
 ```
-## Epoch: Iteration #200 error is: 0.603833623200161
+## Epoch: Iteration #200 error is: 0.80091757309097
 ```
 
 ```
-## Epoch: Iteration #300 error is: 0.167040628688942
+## Epoch: Iteration #300 error is: 0.521594381749651
 ```
 
 ```
-## Epoch: Iteration #400 error is: 0.150465854418218
+## Epoch: Iteration #400 error is: 0.494656312092242
 ```
 
 ```
-## Epoch: Iteration #500 error is: 0.130145060076023
+## Epoch: Iteration #500 error is: 0.480375979470678
 ```
 
 ```
-## Epoch: Iteration #600 error is: 0.104996386002173
+## Epoch: Iteration #600 error is: 0.34316163694454
 ```
 
 ```
-## Epoch: Iteration #700 error is: 0.0570488876460106
+## Epoch: Iteration #700 error is: 0.22793942456359
 ```
 
 ```
-## Epoch: Iteration #800 error is: 0.0214274479694554
+## Epoch: Iteration #800 error is: 0.106205953080816
 ```
 
 ```
-## Epoch: Iteration #900 error is: 0.018661342748595
+## Epoch: Iteration #900 error is: 0.0898143692038221
 ```
 
 ```
-## Epoch: Iteration #1000 error is: 0.0186312982980968
+## Epoch: Iteration #1000 error is: 0.066014061377917
 ```
 
 ```r
@@ -1065,37 +936,57 @@ print(p_tsne_fbasis)
 ```r
 # At single cell level
 dist_ram_cells <- dist(hs.mq@data)
-```
-
-```
-## Error in as.matrix(x): object 'hs.mq' not found
-```
-
-```r
 tsne_ram.c <- tsne::tsne(dist_ram_cells)
 ```
 
 ```
-## Error in "dist" %in% class(X): object 'dist_ram_cells' not found
+## sigma summary: Min. : 0.0131363067079677 |1st Qu. : 0.0200191227308468 |Median : 0.021848832655061 |Mean : 0.0239405053832849 |3rd Qu. : 0.025763593149787 |Max. : 0.0505763424606676 |
+```
+
+```
+## Epoch: Iteration #100 error is: 10.3382138456538
+```
+
+```
+## Epoch: Iteration #200 error is: 0.273775635716397
+```
+
+```
+## Epoch: Iteration #300 error is: 0.233781842048801
+```
+
+```
+## Epoch: Iteration #400 error is: 0.221333601993142
+```
+
+```
+## Epoch: Iteration #500 error is: 0.216942732459677
+```
+
+```
+## Epoch: Iteration #600 error is: 0.214481930307848
+```
+
+```
+## Epoch: Iteration #700 error is: 0.212726808921806
+```
+
+```
+## Epoch: Iteration #800 error is: 0.211327549246717
+```
+
+```
+## Epoch: Iteration #900 error is: 0.21012537193512
+```
+
+```
+## Epoch: Iteration #1000 error is: 0.209065598747353
 ```
 
 ```r
 tsne_ram.c <- data.frame(tsne_ram.c, GrowthPhase = do.call(rbind, strsplit(cell.name, " "))[,1], replicate = do.call(rbind, strsplit(cell.name, " "))[,2])
-```
-
-```
-## Error in data.frame(tsne_ram.c, GrowthPhase = do.call(rbind, strsplit(cell.name, : object 'tsne_ram.c' not found
-```
-
-```r
 colnames(tsne_ram.c)[1:2] <- c("Axis1", "Axis2")
-```
 
-```
-## Error in colnames(tsne_ram.c)[1:2] <- c("Axis1", "Axis2"): object 'tsne_ram.c' not found
-```
-
-```r
 p_tsne_ram.c <- ggplot2::ggplot(tsne_ram.c, ggplot2::aes(x = Axis1, y = Axis2, 
         fill = GrowthPhase, shape = Replicate)) + 
     ggplot2::scale_fill_manual(values = c("#a65628", "red", 
@@ -1109,16 +1000,390 @@ p_tsne_ram.c <- ggplot2::ggplot(tsne_ram.c, ggplot2::aes(x = Axis1, y = Axis2,
         legend.title=element_text(size=15),legend.text=element_text(size=14),
         axis.text = element_text(size=14),title=element_text(size=20),
         strip.background=element_rect(fill=adjustcolor("lightgray",0.2)))
-```
 
-```
-## Error in ggplot2::ggplot(tsne_ram.c, ggplot2::aes(x = Axis1, y = Axis2, : object 'tsne_ram.c' not found
-```
-
-```r
 print(p_tsne_ram.c)
 ```
 
+<img src="Figures/cached/tsne-2-1.png" style="display: block; margin: auto;" />
+
+# Ramanome data
+
+```r
+# Import ramanome data
+df.Ramanone <- read_csv("Ramanome.zip")
 ```
-## Error in print(p_tsne_ram.c): object 'p_tsne_ram.c' not found
+
 ```
+## Multiple files in zip: reading 'External_data/total data.csv'
+```
+
+```
+## Parsed with column specification:
+## cols(
+##   .default = col_double(),
+##   Point = col_character(),
+##   sampleID = col_character(),
+##   group = col_character(),
+##   group_1 = col_character()
+## )
+```
+
+```
+## See spec(...) for full column specifications.
+```
+
+```r
+mat.Ramanome <- as.matrix(df.Ramanone[, - c(1:4)])
+
+# df.Ramanone <- reshape2::melt(df.Ramanone)
+hs.ramanome <- new("hyperSpec", spc = mat.Ramanome, 
+                    wavelength = as.numeric(as.character(colnames(mat.Ramanome))),
+                    labels = df.Ramanone$sampleID)
+rownames(hs.ramanome) <- df.Ramanone$sampleID
+
+
+# Cluster cells
+OPU_hs_ramanome <- ram_clust(hs.ramanome, ram_object = "hs", nclust = 20, PCA = FALSE)
+```
+
+```
+## Tue Feb 20 12:47:40 2018 ---- at k =  10/5284
+## Tue Feb 20 13:00:18 2018 ---- at k =  20/5284
+```
+
+<img src="Figures/cached/ramanome-1-1.png" style="display: block; margin: auto;" />
+
+```r
+# Add metadata and group information 
+OPU_hs_ramanome <- left_join(OPU_hs_ramanome, df.Ramanone[, 2:4], by = c("Sample_label" = "sampleID"))
+
+# Fix some bad group labels
+OPU_hs_ramanome$group_1 <- gsub("_1|_2|_3", "", OPU_hs_ramanome$group_1)
+
+# Get contigency table for PAM per group
+OPU_hs_ramanome_PAM <- OPU_hs_ramanome %>% dplyr::filter(method == "PAM")
+OPU_hs_ramanome_PAM <- data.frame(table(OPU_hs_ramanome_PAM[, c("OPU", "group_1")]))
+
+# Get contigency table for MClust per group
+OPU_hs_ramanome_mclust <- OPU_hs_ramanome %>% dplyr::filter(method == "Mclust")
+OPU_hs_ramanome_mclust <- data.frame(table(OPU_hs_ramanome_mclust[, c("OPU", "group_1")]))
+
+# Format Mclust clusters into otu tables
+OPU_mclust_table_sp <- OPU_hs_ramanome_mclust %>% tidyr::spread(OPU, Freq)
+rownames(OPU_mclust_table_sp) <- OPU_mclust_table_sp$group_1
+OPU_mclust_table_sp <- OPU_mclust_table_sp[, -1]
+OPU_mclust_tax <- as.matrix(data.frame(OPU = colnames(OPU_mclust_table_sp)))
+rownames(OPU_mclust_tax) <- OPU_mclust_tax[,1]
+OPU_mclust_table_sp <- phyloseq(otu_table(OPU_mclust_table_sp, taxa_are_rows = FALSE),
+                           tax_table(OPU_mclust_tax))
+
+div_ram_mclust <- Diversity_16S(OPU_mclust_table_sp, R = 100, brea = FALSE, 
+                             parallel = TRUE, ncores = 10)
+```
+
+```
+## 	**WARNING** this functions assumes that rows are samples and columns
+##       	are taxa in your phyloseq object, please verify.
+## Tue Feb 20 21:29:40 2018 	Using 10 cores for calculations
+## Tue Feb 20 21:29:40 2018	Calculating diversity for sample 1/82 --- amp_h3
+## Tue Feb 20 21:29:54 2018	Done with sample amp_h3
+## Tue Feb 20 21:29:54 2018	Calculating diversity for sample 2/82 --- amp_h5
+## Tue Feb 20 21:29:55 2018	Done with sample amp_h5
+## Tue Feb 20 21:29:55 2018	Calculating diversity for sample 3/82 --- amp_min10
+## Tue Feb 20 21:29:56 2018	Done with sample amp_min10
+## Tue Feb 20 21:29:56 2018	Calculating diversity for sample 4/82 --- amp_min20
+## Tue Feb 20 21:29:57 2018	Done with sample amp_min20
+## Tue Feb 20 21:29:57 2018	Calculating diversity for sample 5/82 --- amp_min30
+## Tue Feb 20 21:29:58 2018	Done with sample amp_min30
+## Tue Feb 20 21:29:58 2018	Calculating diversity for sample 6/82 --- amp_min5
+## Tue Feb 20 21:30:00 2018	Done with sample amp_min5
+## Tue Feb 20 21:30:00 2018	Calculating diversity for sample 7/82 --- amp_min60
+## Tue Feb 20 21:30:01 2018	Done with sample amp_min60
+## Tue Feb 20 21:30:01 2018	Calculating diversity for sample 8/82 --- but_5h
+## Tue Feb 20 21:30:02 2018	Done with sample but_5h
+## Tue Feb 20 21:30:02 2018	Calculating diversity for sample 9/82 --- but_h3
+## Tue Feb 20 21:30:03 2018	Done with sample but_h3
+## Tue Feb 20 21:30:03 2018	Calculating diversity for sample 10/82 --- but_min10
+## Tue Feb 20 21:30:04 2018	Done with sample but_min10
+## Tue Feb 20 21:30:09 2018	Calculating diversity for sample 11/82 --- but_min20
+## Tue Feb 20 21:30:10 2018	Done with sample but_min20
+## Tue Feb 20 21:30:10 2018	Calculating diversity for sample 12/82 --- but_min30
+## Tue Feb 20 21:30:11 2018	Done with sample but_min30
+## Tue Feb 20 21:30:11 2018	Calculating diversity for sample 13/82 --- but_min5
+## Tue Feb 20 21:30:12 2018	Done with sample but_min5
+## Tue Feb 20 21:30:12 2018	Calculating diversity for sample 14/82 --- but_min60
+## Tue Feb 20 21:30:13 2018	Done with sample but_min60
+## Tue Feb 20 21:30:13 2018	Calculating diversity for sample 15/82 --- camp_h3
+## Tue Feb 20 21:30:14 2018	Done with sample camp_h3
+## Tue Feb 20 21:30:14 2018	Calculating diversity for sample 16/82 --- camp_h5
+## Tue Feb 20 21:30:15 2018	Done with sample camp_h5
+## Tue Feb 20 21:30:15 2018	Calculating diversity for sample 17/82 --- camp_min10
+## Tue Feb 20 21:30:16 2018	Done with sample camp_min10
+## Tue Feb 20 21:30:16 2018	Calculating diversity for sample 18/82 --- camp_min20
+## Tue Feb 20 21:30:17 2018	Done with sample camp_min20
+## Tue Feb 20 21:30:17 2018	Calculating diversity for sample 19/82 --- camp_min30
+## Tue Feb 20 21:30:18 2018	Done with sample camp_min30
+## Tue Feb 20 21:30:18 2018	Calculating diversity for sample 20/82 --- camp_min5
+## Tue Feb 20 21:30:19 2018	Done with sample camp_min5
+## Tue Feb 20 21:30:19 2018	Calculating diversity for sample 21/82 --- camp_min60
+## Tue Feb 20 21:30:21 2018	Done with sample camp_min60
+## Tue Feb 20 21:30:21 2018	Calculating diversity for sample 22/82 --- cbut_5h
+## Tue Feb 20 21:30:22 2018	Done with sample cbut_5h
+## Tue Feb 20 21:30:22 2018	Calculating diversity for sample 23/82 --- cbut_h3
+## Tue Feb 20 21:30:23 2018	Done with sample cbut_h3
+## Tue Feb 20 21:30:23 2018	Calculating diversity for sample 24/82 --- cbut_min10
+## Tue Feb 20 21:30:24 2018	Done with sample cbut_min10
+## Tue Feb 20 21:30:24 2018	Calculating diversity for sample 25/82 --- cbut_min20
+## Tue Feb 20 21:30:25 2018	Done with sample cbut_min20
+## Tue Feb 20 21:30:25 2018	Calculating diversity for sample 26/82 --- cbut_min30
+## Tue Feb 20 21:30:26 2018	Done with sample cbut_min30
+## Tue Feb 20 21:30:26 2018	Calculating diversity for sample 27/82 --- cbut_min5
+## Tue Feb 20 21:30:27 2018	Done with sample cbut_min5
+## Tue Feb 20 21:30:27 2018	Calculating diversity for sample 28/82 --- cbut_min60
+## Tue Feb 20 21:30:28 2018	Done with sample cbut_min60
+## Tue Feb 20 21:30:28 2018	Calculating diversity for sample 29/82 --- ccrcu_h3
+## Tue Feb 20 21:30:29 2018	Done with sample ccrcu_h3
+## Tue Feb 20 21:30:29 2018	Calculating diversity for sample 30/82 --- ccrcu_h5
+## Tue Feb 20 21:30:30 2018	Done with sample ccrcu_h5
+## Tue Feb 20 21:30:30 2018	Calculating diversity for sample 31/82 --- ccrcu_min60
+## Tue Feb 20 21:30:31 2018	Done with sample ccrcu_min60
+## Tue Feb 20 21:30:31 2018	Calculating diversity for sample 32/82 --- ccr_min10
+## Tue Feb 20 21:30:32 2018	Done with sample ccr_min10
+## Tue Feb 20 21:30:32 2018	Calculating diversity for sample 33/82 --- ccr_min20
+## Tue Feb 20 21:30:33 2018	Done with sample ccr_min20
+## Tue Feb 20 21:30:33 2018	Calculating diversity for sample 34/82 --- ccr_min30
+## Tue Feb 20 21:30:34 2018	Done with sample ccr_min30
+## Tue Feb 20 21:30:34 2018	Calculating diversity for sample 35/82 --- ccr_min5
+## Tue Feb 20 21:30:35 2018	Done with sample ccr_min5
+## Tue Feb 20 21:30:35 2018	Calculating diversity for sample 36/82 --- ccu_min10
+## Tue Feb 20 21:30:36 2018	Done with sample ccu_min10
+## Tue Feb 20 21:30:36 2018	Calculating diversity for sample 37/82 --- ccu_min20
+## Tue Feb 20 21:30:37 2018	Done with sample ccu_min20
+## Tue Feb 20 21:30:37 2018	Calculating diversity for sample 38/82 --- ccu_min30
+## Tue Feb 20 21:30:38 2018	Done with sample ccu_min30
+## Tue Feb 20 21:30:38 2018	Calculating diversity for sample 39/82 --- ccu_min5
+## Tue Feb 20 21:30:39 2018	Done with sample ccu_min5
+## Tue Feb 20 21:30:39 2018	Calculating diversity for sample 40/82 --- ceth_h3
+## Tue Feb 20 21:30:40 2018	Done with sample ceth_h3
+## Tue Feb 20 21:30:40 2018	Calculating diversity for sample 41/82 --- ceth_h5
+## Tue Feb 20 21:30:41 2018	Done with sample ceth_h5
+## Tue Feb 20 21:30:41 2018	Calculating diversity for sample 42/82 --- ceth_min10
+## Tue Feb 20 21:30:42 2018	Done with sample ceth_min10
+## Tue Feb 20 21:30:42 2018	Calculating diversity for sample 43/82 --- ceth_min20
+## Tue Feb 20 21:30:43 2018	Done with sample ceth_min20
+## Tue Feb 20 21:30:43 2018	Calculating diversity for sample 44/82 --- ceth_min30
+## Tue Feb 20 21:30:44 2018	Done with sample ceth_min30
+## Tue Feb 20 21:30:44 2018	Calculating diversity for sample 45/82 --- ceth_min5
+## Tue Feb 20 21:30:45 2018	Done with sample ceth_min5
+## Tue Feb 20 21:30:45 2018	Calculating diversity for sample 46/82 --- ceth_min60
+## Tue Feb 20 21:30:46 2018	Done with sample ceth_min60
+## Tue Feb 20 21:30:46 2018	Calculating diversity for sample 47/82 --- ckanamp_h3
+## Tue Feb 20 21:30:48 2018	Done with sample ckanamp_h3
+## Tue Feb 20 21:30:48 2018	Calculating diversity for sample 48/82 --- ckan_h5
+## Tue Feb 20 21:30:49 2018	Done with sample ckan_h5
+## Tue Feb 20 21:30:49 2018	Calculating diversity for sample 49/82 --- ckan_min10
+## Tue Feb 20 21:30:50 2018	Done with sample ckan_min10
+## Tue Feb 20 21:30:50 2018	Calculating diversity for sample 50/82 --- ckan_min20
+## Tue Feb 20 21:30:51 2018	Done with sample ckan_min20
+## Tue Feb 20 21:30:51 2018	Calculating diversity for sample 51/82 --- ckan_min30
+## Tue Feb 20 21:30:52 2018	Done with sample ckan_min30
+## Tue Feb 20 21:30:52 2018	Calculating diversity for sample 52/82 --- ckan_min5
+## Tue Feb 20 21:30:53 2018	Done with sample ckan_min5
+## Tue Feb 20 21:30:53 2018	Calculating diversity for sample 53/82 --- ckan_min60
+## Tue Feb 20 21:30:54 2018	Done with sample ckan_min60
+## Tue Feb 20 21:30:54 2018	Calculating diversity for sample 54/82 --- cr_h3
+## Tue Feb 20 21:30:55 2018	Done with sample cr_h3
+## Tue Feb 20 21:30:55 2018	Calculating diversity for sample 55/82 --- cr_h5
+## Tue Feb 20 21:30:56 2018	Done with sample cr_h5
+## Tue Feb 20 21:30:56 2018	Calculating diversity for sample 56/82 --- cr_min10
+## Tue Feb 20 21:30:57 2018	Done with sample cr_min10
+## Tue Feb 20 21:30:57 2018	Calculating diversity for sample 57/82 --- cr_min20
+## Tue Feb 20 21:30:58 2018	Done with sample cr_min20
+## Tue Feb 20 21:30:58 2018	Calculating diversity for sample 58/82 --- cr_min30
+## Tue Feb 20 21:30:59 2018	Done with sample cr_min30
+## Tue Feb 20 21:30:59 2018	Calculating diversity for sample 59/82 --- cr_min5
+## Tue Feb 20 21:31:00 2018	Done with sample cr_min5
+## Tue Feb 20 21:31:00 2018	Calculating diversity for sample 60/82 --- cr_min60
+## Tue Feb 20 21:31:01 2018	Done with sample cr_min60
+## Tue Feb 20 21:31:01 2018	Calculating diversity for sample 61/82 --- cu_h3
+## Tue Feb 20 21:31:02 2018	Done with sample cu_h3
+## Tue Feb 20 21:31:02 2018	Calculating diversity for sample 62/82 --- cu_h5
+## Tue Feb 20 21:31:03 2018	Done with sample cu_h5
+## Tue Feb 20 21:31:03 2018	Calculating diversity for sample 63/82 --- cu_min10
+## Tue Feb 20 21:31:04 2018	Done with sample cu_min10
+## Tue Feb 20 21:31:04 2018	Calculating diversity for sample 64/82 --- cu_min20
+## Tue Feb 20 21:31:05 2018	Done with sample cu_min20
+## Tue Feb 20 21:31:05 2018	Calculating diversity for sample 65/82 --- cu_min30
+## Tue Feb 20 21:31:06 2018	Done with sample cu_min30
+## Tue Feb 20 21:31:06 2018	Calculating diversity for sample 66/82 --- cu_min5
+## Tue Feb 20 21:31:07 2018	Done with sample cu_min5
+## Tue Feb 20 21:31:07 2018	Calculating diversity for sample 67/82 --- cu_min60
+## Tue Feb 20 21:31:08 2018	Done with sample cu_min60
+## Tue Feb 20 21:31:08 2018	Calculating diversity for sample 68/82 --- eth_h3
+## Tue Feb 20 21:31:10 2018	Done with sample eth_h3
+## Tue Feb 20 21:31:10 2018	Calculating diversity for sample 69/82 --- eth_h5
+## Tue Feb 20 21:31:11 2018	Done with sample eth_h5
+## Tue Feb 20 21:31:11 2018	Calculating diversity for sample 70/82 --- eth_min10
+## Tue Feb 20 21:31:12 2018	Done with sample eth_min10
+## Tue Feb 20 21:31:12 2018	Calculating diversity for sample 71/82 --- eth_min20
+## Tue Feb 20 21:31:13 2018	Done with sample eth_min20
+## Tue Feb 20 21:31:13 2018	Calculating diversity for sample 72/82 --- eth_min30
+## Tue Feb 20 21:31:14 2018	Done with sample eth_min30
+## Tue Feb 20 21:31:14 2018	Calculating diversity for sample 73/82 --- eth_min5
+## Tue Feb 20 21:31:15 2018	Done with sample eth_min5
+## Tue Feb 20 21:31:15 2018	Calculating diversity for sample 74/82 --- eth_min60
+## Tue Feb 20 21:31:16 2018	Done with sample eth_min60
+## Tue Feb 20 21:31:16 2018	Calculating diversity for sample 75/82 --- kan_h3
+## Tue Feb 20 21:31:17 2018	Done with sample kan_h3
+## Tue Feb 20 21:31:17 2018	Calculating diversity for sample 76/82 --- kan_h5
+## Tue Feb 20 21:31:18 2018	Done with sample kan_h5
+## Tue Feb 20 21:31:18 2018	Calculating diversity for sample 77/82 --- kan_min10
+## Tue Feb 20 21:31:19 2018	Done with sample kan_min10
+## Tue Feb 20 21:31:19 2018	Calculating diversity for sample 78/82 --- kan_min20
+## Tue Feb 20 21:31:20 2018	Done with sample kan_min20
+## Tue Feb 20 21:31:20 2018	Calculating diversity for sample 79/82 --- kan_min30
+## Tue Feb 20 21:31:21 2018	Done with sample kan_min30
+## Tue Feb 20 21:31:21 2018	Calculating diversity for sample 80/82 --- kan_min5
+## Tue Feb 20 21:31:22 2018	Done with sample kan_min5
+## Tue Feb 20 21:31:22 2018	Calculating diversity for sample 81/82 --- kan_min60
+## Tue Feb 20 21:31:24 2018	Done with sample kan_min60
+## Tue Feb 20 21:31:24 2018	Calculating diversity for sample 82/82 --- min0
+## Tue Feb 20 21:31:25 2018	Done with sample min0
+## Tue Feb 20 21:31:25 2018 	Closing workers
+## Tue Feb 20 21:31:25 2018 	Done with all 82 samples
+```
+
+```r
+div_ram_results <- data.frame(SampleID = rownames(div_ram_mclust), div_ram_mclust,
+                              Treatment = do.call(rbind, base::strsplit("_", x = as.character(div_ram_results$SampleID)))[, 1],
+                              Timepoint = do.call(rbind, base::strsplit("_", x = as.character(div_ram_results$SampleID)))[, 2]
+)
+```
+
+```
+## Error in base::strsplit("_", x = as.character(div_ram_results$SampleID)): object 'div_ram_results' not found
+```
+
+```r
+div_ram_results$Timepoint[div_ram_results$Timepoint == "5h"] <- "h5"
+```
+
+```
+## Error in div_ram_results$Timepoint[div_ram_results$Timepoint == "5h"] <- "h5": object 'div_ram_results' not found
+```
+
+```r
+div_ram_results$Timepoint <- factor(as.character(div_ram_results$Timepoint),
+                                    levels = c("min0", "min5", "min10", "min20", "min30", "min60","h3", "h5"))
+```
+
+```
+## Error in factor(as.character(div_ram_results$Timepoint), levels = c("min0", : object 'div_ram_results' not found
+```
+
+
+```r
+# Plot results
+p_ram_div_mclust <- div_ram_results %>% dplyr::filter(Timepoint != "min0") %>% 
+  ggplot(aes(x = Timepoint, y = D2))+
+  geom_point(shape = 21, size = 4, fill = "lightblue")+
+  # geom_boxplot(alpha = 0.4)+
+  ggplot2::theme_bw()+
+     theme(axis.title=element_text(size=16), strip.text=element_text(size=16),
+        legend.title=element_text(size=15),legend.text=element_text(size=14),
+        axis.text = element_text(size=14),title=element_text(size=20),
+        axis.text.x = element_text(angle = 45, hjust = 1),
+        strip.background=element_rect(fill=adjustcolor("lightgray",0.2))
+        #,panel.grid.major = element_blank(), panel.grid.minor = element_blank()
+        )+
+  scale_fill_brewer(palette = "Accent")+
+  facet_wrap(~Treatment, ncol = 4)+
+  geom_errorbar(aes(ymin = D2 - sd.D2, ymax = D2 + sd.D2), width = 0.025)+
+  guides(fill = FALSE)+
+  ylab(expression("Phenotypic diversity - D2 (Raman)"))+
+  ylim(0,3)
+```
+
+```
+## Error in eval(lhs, parent, parent): object 'div_ram_results' not found
+```
+
+```r
+print(p_ram_div_mclust)
+```
+
+<img src="Figures/cached/ramanome-2-1.png" style="display: block; margin: auto;" />
+
+
+```r
+# At single cell level
+dist_ram_cells <- dist(hs.ramanome@data)
+tsne_ram.ramano <- tsne::tsne(dist_ram_cells)
+```
+
+```
+## sigma summary: Min. : 0.0449931944152712 |1st Qu. : 0.0615784127951392 |Median : 0.0674722700563012 |Mean : 0.0785796125820395 |3rd Qu. : 0.0766288494018514 |Max. : 0.204728864983115 |
+```
+
+```
+## Epoch: Iteration #100 error is: 26.5667585538527
+```
+
+```
+## Epoch: Iteration #200 error is: 2.654587008298
+```
+
+```
+## Epoch: Iteration #300 error is: 2.49635910996362
+```
+
+```
+## Epoch: Iteration #400 error is: 2.43157763906048
+```
+
+```
+## Epoch: Iteration #500 error is: 2.40369612980713
+```
+
+```
+## Epoch: Iteration #600 error is: 2.3873832650934
+```
+
+```
+## Epoch: Iteration #700 error is: 2.37646007329124
+```
+
+```
+## Epoch: Iteration #800 error is: 2.36845609613973
+```
+
+```
+## Epoch: Iteration #900 error is: 2.36224708967142
+```
+
+```
+## Epoch: Iteration #1000 error is: 2.35722819347934
+```
+
+```r
+tsne_ram.ramano <- data.frame(tsne_ram.ramano, Treatment = do.call(rbind, base::strsplit("_", x = as.character(df.Ramanone$sampleID)))[, 1])
+
+
+colnames(tsne_ram.ramano)[1:2] <- c("Axis1", "Axis2")
+
+p_tsne_ram.c <- ggplot2::ggplot(tsne_ram.ramano, ggplot2::aes(x = Axis1, y = Axis2, 
+        fill = Treatment)) + 
+    ggplot2::scale_fill_brewer(palette = "Paired") +
+  ggplot2::geom_point(alpha = 0.7, 
+        size = 4, colour = "black", shape = 21) + 
+  ggplot2::labs(x = paste0("Axis1"), y = paste0("Axis2"))+
+  theme_bw()+
+  theme(axis.title=element_text(size=16), strip.text=element_text(size=16),
+        legend.title=element_text(size=15),legend.text=element_text(size=14),
+        axis.text = element_text(size=14),title=element_text(size=20),
+        strip.background=element_rect(fill=adjustcolor("lightgray",0.2)))
+
+print(p_tsne_ram.c)
+```
+
+<img src="Figures/cached/ramanome-3-1.png" style="display: block; margin: auto;" />

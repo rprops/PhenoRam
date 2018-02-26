@@ -55,6 +55,7 @@ library("cluster")
 library("grid")
 library("egg")
 library("MALDIquant")
+library("hyperSpec")
 library("reshape2")
 library("caret") # for cross validation
 library("foreach") # for parallelization
@@ -177,76 +178,32 @@ for (i in 1:length(mq.norm)){
 }
 hs.mq <- new("hyperSpec", spc = matrix.spectra, wavelength = wv_mq, labels = cell.name)
 
-# Choose if you want to run PCA prior to clustering
-PCA <- FALSE
-PEAKS <- FALSE
-
-if(PCA == TRUE){
-  # Perform PCA to reduce number of features in fingerprint
-  pca_bacteria <- prcomp(hs.mq)
-
-  # Only retain PC which explain 90% of the variance
-  thresh <- 0.9
-  nr_pc_bacteria <- min(which((cumsum(vegan::eigenvals(pca_bacteria)/sum(vegan::eigenvals(pca_bacteria)))>thresh) == TRUE))
-  pc_cluster_bacteria <- pca_bacteria$x[, 1:nr_pc_bacteria]
-} else if(PEAKS == TRUE){
-  # Run peak detection algorithm
-    peaks <- detectPeaks(mq.norm, method="MAD", halfWindowSize=1, SNR=0.001)
-    plot(mq.norm[[1]], xlim=c(600, 1800))
-    points(peaks[[1]], col="red", pch=4)
-
-    # Tolerance for wave number shift
-    peaks <- binPeaks(peaks, tolerance = 0.002)
-  
-    # Filter out intensities at peak wave numbers
-    peaks <- filterPeaks(peaks, minFrequency = 0.25)
-
-    pc_cluster_bacteria <- intensityMatrix(peaks, mq.norm)
-} else {
-  pc_cluster_bacteria <- hs.mq
-}
-
-# Evaluate number of robust clusters by means of silhouette index
-# We limit the search to 50 clusters
-tmp.si <- c()
-for(i in 2:50){
-  if(i%%10 == 0) cat(date(), paste0("---- at k =  ", i, "/",  nrow(pc_cluster_bacteria), "\n"))
-  tmp.si[i] <- pam(pc_cluster_bacteria, k = i)$silinfo$avg.width
-}
-nr_clusters_bacteria <- which(tmp.si == max(tmp.si, na.rm = TRUE))
-
-# Plot Silhouette index distribution
-plot(tmp.si, type = "l", ylab = "Silhouette index", 
-     xlab = "Number of clusters")
-
-# Cluster samples and export cluster labels
-clusters_bacteria <- pam(pc_cluster_bacteria, k = nr_clusters_bacteria)
-
-# Extract cluster labels
-cluster_labels_pam <- data.frame(Sample = cell.name,
-                                      cluster_label = clusters_bacteria$clustering)
+# Perform clustering
+OP_mq <- ram_clust(hs.mq, ram_object = "hs")
 
 # Method 2: the Mclust( ) function in the mclust package selects the optimal model according to BIC for EM initialized by hierarchical clustering for parameterized Gaussian mixture models.
-if(PEAKS == TRUE){
-  mc_fit <- Mclust(as.matrix(pc_cluster_bacteria))
-} else {
-  mc_fit <- Mclust(pc_cluster_bacteria, G = 13)
-}
-
-# plot(fit) # plot results 
-summary(mc_fit) # display the best model
-
-cluster_labels_mc <- data.frame(Sample = cell.name,
-                                      cluster_label = mc_fit$classification)
+# if(PEAKS == TRUE){
+#   mc_fit <- Mclust(as.matrix(pc_cluster_bacteria))
+# } else {
+#   mc_fit <- Mclust(pc_cluster_bacteria, G = 13)
+# }
+# 
+# # plot(fit) # plot results 
+# summary(mc_fit) # display the best model
+# 
 
 # To compare both clustering approaches:
 # cluster.stats(dist(hs.mq), mc_fit$classification, clusters_bacteria$clustering)
 
 # Extract count table (i.e. "operational phenotypic unit table") for each sample
-OPU_mq_pam <- data.frame(table(cluster_labels_pam))
+OPU_mq_pam <- OP_mq %>% dplyr::filter(method == "PAM") %>% droplevels()
+OPU_mq_pam <- data.frame(OPU_mq_pam, Sample = cell.name)
+OPU_mq_pam <- data.frame(table(OPU_mq_pam[, c("Sample","OPU")]))
 # print(OPU_hs_pam)
 
-OPU_mq_mc <- data.frame(table(cluster_labels_mc))
+OPU_mq_mc <- OP_mq %>% dplyr::filter(method == "Mclust") %>% droplevels()
+OPU_mq_mc <- data.frame(OPU_mq_mc, Sample = cell.name)
+OPU_mq_mc <- data.frame(table(OPU_mq_mc[, c("Sample","OPU")]))
 # print(OPU_hs_mc)
 
 # Merge cluster outputs in long format df
@@ -631,7 +588,7 @@ print(p_tsne_ram.c)
 # Ramanome data
 ```{r ramanome-1, fig.width = 10, fig.height= 6, dpi = 500, warning=FALSE}
 # Import ramanome data
-df.Ramanone <- read_csv("./External_data/Ramanome.zip")
+df.Ramanone <- read_csv("Ramanome.zip")
 mat.Ramanome <- as.matrix(df.Ramanone[, - c(1:4)])
 
 # df.Ramanone <- reshape2::melt(df.Ramanone)
@@ -640,11 +597,156 @@ hs.ramanome <- new("hyperSpec", spc = mat.Ramanome,
                     labels = df.Ramanone$sampleID)
 rownames(hs.ramanome) <- df.Ramanone$sampleID
 
-# Format data into maldiquant/hyperspec object
+# Cluster cells
+OPU_hs_ramanome <- ram_clust(hs.ramanome, ram_object = "hs", nclust = 10, PCA = FALSE)
 
-# Run preprocessing
+# Add metadata and group information 
+OPU_hs_ramanome <- left_join(OPU_hs_ramanome, df.Ramanone[, 2:4], by = c("Sample_label" = "sampleID"))
 
-# 
-test <- ram_clust(hs.ramanome, ram_object = "hs", nclust = 20, PCA = TRUE)
+# Fix some bad group labels
+OPU_hs_ramanome$group_1 <- gsub("_1|_2|_3", "", OPU_hs_ramanome$group_1)
 
+# Get contigency table for PAM per group
+OPU_hs_ramanome_PAM <- OPU_hs_ramanome %>% dplyr::filter(method == "PAM")
+OPU_hs_ramanome_PAM <- data.frame(table(OPU_hs_ramanome_PAM[, c("OPU", "group_1")]))
+
+# Get contigency table for MClust per group
+OPU_hs_ramanome_mclust <- OPU_hs_ramanome %>% dplyr::filter(method == "Mclust")
+OPU_hs_ramanome_mclust <- data.frame(table(OPU_hs_ramanome_mclust[, c("OPU", "group_1")]))
+
+# Format Mclust clusters into otu tables
+OPU_mclust_table_sp <- OPU_hs_ramanome_mclust %>% tidyr::spread(OPU, Freq)
+rownames(OPU_mclust_table_sp) <- OPU_mclust_table_sp$group_1
+OPU_mclust_table_sp <- OPU_mclust_table_sp[, -1]
+OPU_mclust_tax <- data.frame(OPU = paste("OPU", colnames(OPU_mclust_table_sp), sep = ""))
+OPU_mclust_tax <- tax_table(OPU_mclust_tax)
+rownames(OPU_mclust_tax) <- colnames(OPU_mclust_table_sp)
+colnames(OPU_mclust_tax) <- "OPU"
+OPU_mclust_table_sp <- phyloseq(otu_table(OPU_mclust_table_sp, taxa_are_rows = FALSE),
+                           OPU_mclust_tax)
+
+div_ram_mclust <- Diversity_16S(OPU_mclust_table_sp, R = 100, brea = FALSE, 
+                             parallel = TRUE, ncores = 10)
+```
+
+```{r ramanome-2, fig.width = 10, fig.height= 7, dpi = 500, warning=FALSE}
+# Format results
+div_ram_results <- data.frame(SampleID = rownames(div_ram_mclust), div_ram_mclust)
+div_ram_results <- data.frame(div_ram_results,
+                              Treatment = do.call(rbind, base::strsplit("_", x = as.character(div_ram_results$SampleID)))[, 1],
+                              Timepoint = do.call(rbind, base::strsplit("_", x = as.character(div_ram_results$SampleID)))[, 2])
+div_ram_results$Timepoint[div_ram_results$Timepoint == "5h"] <- "h5"
+div_ram_results$Timepoint <- factor(as.character(div_ram_results$Timepoint),
+                                    levels = c("min0", "min5", "min10", "min20", "min30", "min60","h3", "h5"))
+# div_ram_results$Treatment <- gsub("ckanamp","ckan",div_ram_results$Treatment)
+# div_ram_results$Treatment <- gsub("ccrcu","ccr",div_ram_results$Treatment)
+
+# Plot results
+p_ram_div_mclust <- div_ram_results %>% dplyr::filter(Timepoint != "min0") %>% 
+  ggplot(aes(x = Timepoint, y = D2))+
+  geom_point(shape = 21, size = 4, fill = "lightblue")+
+  # geom_boxplot(alpha = 0.4)+
+  ggplot2::theme_bw()+
+     theme(axis.title=element_text(size=16), strip.text=element_text(size=16),
+        legend.title=element_text(size=15),legend.text=element_text(size=14),
+        axis.text = element_text(size=14),title=element_text(size=20),
+        axis.text.x = element_text(angle = 45, hjust = 1),
+        strip.background=element_rect(fill=adjustcolor("lightgray",0.2))
+        #,panel.grid.major = element_blank(), panel.grid.minor = element_blank()
+        )+
+  scale_fill_brewer(palette = "Accent")+
+  facet_wrap(~Treatment, ncol = 4)+
+  geom_errorbar(aes(ymin = D2 - sd.D2, ymax = D2 + sd.D2), width = 0.025)+
+  guides(fill = FALSE)+
+  ylab(expression("Phenotypic diversity - D2 (Raman)"))+
+  ylim(0,3)
+
+pdf("OPU_div_ramanome.pdf", height = 8, width =10)
+print(p_ram_div_mclust)
+dev.off()
+
+# Plot results in barplot format
+OPU_hs_ramanome_mclust <- data.frame(OPU_hs_ramanome_mclust ,  
+                                      Treatment = do.call(rbind, base::strsplit("_", x = as.character(OPU_hs_ramanome_mclust$group_1)))[, 1],
+                                      Timepoint = do.call(rbind, base::strsplit("_", x = as.character(OPU_hs_ramanome_mclust$group_1)))[, 2])
+
+OPU_hs_ramanome_mclust$Timepoint[OPU_hs_ramanome_mclust$Timepoint == "5h"] <- "h5"
+OPU_hs_ramanome_mclust$Timepoint <- factor(as.character(OPU_hs_ramanome_mclust$Timepoint),
+                                    levels = c("min0", "min5", "min10", "min20", "min30", "min60","h3", "h5"))
+
+p_ram_div_mclust <- OPU_hs_ramanome_mclust %>% dplyr::filter(Timepoint != "min0") %>% 
+  group_by(group_1) %>% mutate(Freq_rel = Freq/sum(Freq)) %>% 
+  ggplot(aes(x = Timepoint, y = 100*Freq_rel, fill = OPU))+
+  geom_bar(stat = "identity")+
+  # geom_boxplot(alpha = 0.4)+
+  ggplot2::theme_bw()+
+     theme(axis.title=element_text(size=16), strip.text=element_text(size=16),
+        legend.title=element_text(size=15),legend.text=element_text(size=14),
+        axis.text = element_text(size=14),title=element_text(size=20),
+        axis.text.x = element_text(angle = 45, hjust = 1),
+        strip.background=element_rect(fill=adjustcolor("lightgray",0.2))
+        #,panel.grid.major = element_blank(), panel.grid.minor = element_blank()
+        )+
+  scale_fill_brewer(palette = "Accent")+
+  facet_wrap(~Treatment, ncol = 4)+
+  guides(fill = FALSE)+
+  ylab(expression("Relative abundance (%)"))
+
+pdf("OPU_barplot_ramanome.pdf", height = 8, width =10)
+print(p_ram_div_mclust)
+dev.off()
+```
+
+```{r ramanome-3, fig.width = 8, fig.height= 6, dpi = 500, warning=FALSE}
+# At single cell level
+dist_ram_cells <- dist(hs.ramanome@data)
+tsne_ram.ramano <- tsne::tsne(dist_ram_cells)
+tsne_ram.ramano <- data.frame(tsne_ram.ramano, 
+                              Treatment = do.call(rbind, base::strsplit("_", x = gsub("_1|_2|_3", "", df.Ramanone$group_1)))[, 1],
+                              Timepoint = do.call(rbind, base::strsplit("_", x = gsub("_1|_2|_3", "", df.Ramanone$group_1)))[, 2])
+# Fix some bad group labels
+tsne_ram.ramano$Timepoint[tsne_ram.ramano$Timepoint == "5h"] <- "h5"
+tsne_ram.ramano$Timepoint <- factor(as.character(tsne_ram.ramano$Timepoint),
+                                    levels = c("min0", "min5", "min10", "min20", "min30", "min60","h3", "h5"))
+
+
+colnames(tsne_ram.ramano)[1:2] <- c("Axis1", "Axis2")
+
+pdf("tsne_ramanome.pdf", height = 18, width =18)
+p_tsne_ram.c <- tsne_ram.ramano %>% dplyr::filter(Timepoint != "min0") %>% 
+  ggplot2::ggplot(ggplot2::aes(x = Axis1, y = Axis2, 
+        fill = Treatment)) + 
+  facet_grid(Treatment~Timepoint)+
+    ggplot2::scale_fill_brewer(palette = "Paired") +
+  ggplot2::geom_point(alpha = 0.7, 
+        size = 4, colour = "black", shape = 21) + 
+  ggplot2::labs(x = paste0("Axis1"), y = paste0("Axis2"))+
+  theme_bw()+
+  theme(axis.title=element_text(size=16), strip.text=element_text(size=16),
+        legend.title=element_text(size=15),legend.text=element_text(size=14),
+        axis.text = element_text(size=14),title=element_text(size=20),
+        strip.background=element_rect(fill=adjustcolor("lightgray",0.2)),
+        legend.position = "top")
+
+print(p_tsne_ram.c)
+dev.off()
+
+pdf("tsne_ramanome2.pdf", height = 5, width =18)
+p_tsne_ram.c2 <- tsne_ram.ramano %>% dplyr::filter(Timepoint != "min0") %>% 
+  ggplot2::ggplot(ggplot2::aes(x = Axis1, y = Axis2, 
+        fill = Treatment)) + 
+  facet_grid(~Treatment)+
+    ggplot2::scale_fill_brewer(palette = "Paired") +
+  ggplot2::geom_point(alpha = 0.7, 
+        size = 4, colour = "black", shape = 21) + 
+  ggplot2::labs(x = paste0("Axis1"), y = paste0("Axis2"))+
+  theme_bw()+
+  theme(axis.title=element_text(size=16), strip.text=element_text(size=16),
+        legend.title=element_text(size=15),legend.text=element_text(size=14),
+        axis.text = element_text(size=14),title=element_text(size=20),
+        strip.background=element_rect(fill=adjustcolor("lightgray",0.2)),
+        legend.position = "top")
+
+print(p_tsne_ram.c2)
+dev.off()
 ```
